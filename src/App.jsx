@@ -55,6 +55,37 @@ function formatUrl(url) {
   return `https://${cleanUrl}`;
 }
 
+function getGoogleDriveFileId(url) {
+  const cleanUrl = (url || "").trim();
+  const patterns = [
+    /drive\.google\.com\/file\/d\/([^/]+)/i,
+    /drive\.google\.com\/open\?id=([^&]+)/i,
+    /drive\.google\.com\/uc\?id=([^&]+)/i,
+    /drive\.google\.com\/thumbnail\?id=([^&]+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = cleanUrl.match(pattern);
+
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return "";
+}
+
+function formatCertificateImageUrl(url) {
+  const cleanUrl = (url || "").trim();
+  const driveFileId = getGoogleDriveFileId(cleanUrl);
+
+  if (driveFileId) {
+    return `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w1200`;
+  }
+
+  return formatUrl(cleanUrl);
+}
+
 function formatMailto(email) {
   const cleanEmail = (email || "").trim();
   return cleanEmail ? `mailto:${cleanEmail}` : "#";
@@ -913,7 +944,12 @@ function Certificates({ certificates }) {
                 viewport={{ once: true }}
               >
                 {cert.imageUrl ? (
-                  <img src={cert.imageUrl} alt={cert.title} className="bo-project-img" />
+                  <img
+                    src={formatCertificateImageUrl(cert.imageUrl)}
+                    alt={cert.title}
+                    className="bo-project-img"
+                    referrerPolicy="no-referrer"
+                  />
                 ) : (
                   <div className="bo-project-img bo-cert-placeholder">
                     🏆
@@ -2041,7 +2077,7 @@ function AdminPanel({
                     handleCertificateChange("imageUrl", e.target.value)
                   }
                   className="admin-input"
-                  placeholder="Certificate image URL"
+                  placeholder="Certificate image URL or Google Drive share link"
                 />
 
                 <input
