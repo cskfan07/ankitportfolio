@@ -48,11 +48,52 @@ function formatUrl(url) {
 
   const cleanUrl = url.trim();
 
-  if (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://")) {
+  if (/^https?:\/\//i.test(cleanUrl)) {
     return cleanUrl;
   }
 
   return `https://${cleanUrl}`;
+}
+
+function formatMailto(email) {
+  const cleanEmail = (email || "").trim();
+  return cleanEmail ? `mailto:${cleanEmail}` : "#";
+}
+
+function LinkifiedText({ text }) {
+  const value = String(text || "");
+  const pattern =
+    /(https?:\/\/[^\s]+|www\.[^\s]+|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
+  const parts = value.split(pattern);
+
+  return parts.map((part, index) => {
+    if (!part) {
+      return null;
+    }
+
+    if (/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(part)) {
+      return (
+        <a key={`${part}-${index}`} href={formatMailto(part)}>
+          {part}
+        </a>
+      );
+    }
+
+    if (/^(https?:\/\/|www\.)/i.test(part)) {
+      return (
+        <a
+          key={`${part}-${index}`}
+          href={formatUrl(part)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {part}
+        </a>
+      );
+    }
+
+    return part;
+  });
 }
 
 function useScrollReveal() {
@@ -97,9 +138,10 @@ const defaultProfile = {
     "I build projects using Java Servlet/JSP, React, Django, MySQL and MongoDB.",
   goal:
     "My goal is to become a confident full-stack developer and build deployable applications.",
-  email: "yourmail@gmail.com",
-  github: "#",
-  linkedin: "#",
+  email: "ga8774040@gmail.com",
+  github: "https://github.com/cskfan07",
+  linkedin:
+    "https://www.linkedin.com/in/ankit-gupta2201?utm_source=share_via&utm_content=profile&utm_medium=member_android",
   resumeUrl: "#",
 };
 
@@ -535,7 +577,7 @@ function Hero({ scrollToSection, profile }) {
           <a href={formatUrl(profile.linkedin)} target="_blank" rel="noreferrer">
             in
           </a>
-          <a href={`mailto:${profile.email}`}>@</a>
+          <a href={formatMailto(profile.email)}>@</a>
         </div>
 
         <div className="bo-side-text">PORTFOLIO</div>
@@ -579,7 +621,7 @@ function Hero({ scrollToSection, profile }) {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 0.1 }}
           >
-            <div className="bo-certificate-stamp">CERTIFICATES</div>
+            <div className="bo-certificate-stamp">MKY_2201</div>
             <div className="bo-avatar" />
             <div className="bo-laptop" />
             <img
@@ -610,7 +652,7 @@ function About({ profile }) {
         <div className="bo-social">
           <a href={formatUrl(profile.github)} target="_blank" rel="noreferrer">GH</a>
           <a href={formatUrl(profile.linkedin)} target="_blank" rel="noreferrer">in</a>
-          <a href={`mailto:${profile.email}`}>@</a>
+          <a href={formatMailto(profile.email)}>@</a>
         </div>
         <div className="bo-side-text">ABOUT</div>
 
@@ -887,7 +929,7 @@ function Contact({ profile }) {
         <div className="bo-social">
           <a href={formatUrl(profile.github)} target="_blank" rel="noreferrer">GH</a>
           <a href={formatUrl(profile.linkedin)} target="_blank" rel="noreferrer">in</a>
-          <a href={`mailto:${profile.email}`}>@</a>
+          <a href={formatMailto(profile.email)}>@</a>
         </div>
         <div className="bo-side-text">MESSAGE</div>
 
@@ -935,9 +977,30 @@ function Contact({ profile }) {
             <div>
               <div className="bo-info-card bo-contact-info">
                 <h3 className="bo-card-title">Personal Info</h3>
-                <p className="bo-card-text">LinkedIn: {profile.linkedin}</p>
-                <p className="bo-card-text">GitHub: {profile.github}</p>
-                <p className="bo-card-text">Email: {profile.email}</p>
+                <div className="bo-contact-actions">
+                  <a
+                    className="bo-contact-button"
+                    href={formatUrl(profile.linkedin)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    LinkedIn
+                  </a>
+                  <a
+                    className="bo-contact-button"
+                    href={formatUrl(profile.github)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    GitHub
+                  </a>
+                  <a
+                    className="bo-contact-button"
+                    href={formatMailto(profile.email)}
+                  >
+                    Email
+                  </a>
+                </div>
               </div>
 
               <div className="bo-map">
@@ -1992,7 +2055,7 @@ function AdminPanel({
                       <div>
                         <h4 className="font-bold">{msg.name}</h4>
                         <a
-                          href={`mailto:${msg.email}`}
+                          href={formatMailto(msg.email)}
                           className="text-sm text-blue-200 hover:underline"
                         >
                           {msg.email}
@@ -2011,7 +2074,7 @@ function AdminPanel({
                     </div>
 
                     <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300">
-                      {msg.message}
+                      <LinkifiedText text={msg.message} />
                     </p>
 
                     <p className="mt-3 text-xs text-slate-500">
@@ -2027,7 +2090,7 @@ function AdminPanel({
                       </button>
 
                       <a
-                        href={`mailto:${msg.email}`}
+                        href={formatMailto(msg.email)}
                         className="rounded-xl bg-blue-500 px-3 py-2 text-sm hover:bg-blue-400"
                       >
                         Reply

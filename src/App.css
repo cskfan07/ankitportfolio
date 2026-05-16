@@ -2463,7 +2463,137 @@ body,
 /* mobile */
 @media (max-width: 900px) {
   .bo-profile-img-slide {
-    width: 220px;
-    bottom: 18px;
+    width: 176px;
+    bottom: 80px;
+  }
+}
+
+/* ===== Contact links + responsive polish ===== */
+.bo-contact-grid,
+.bo-card-grid,
+.bo-skill-wrap,
+.bo-hero-grid,
+.fixed.inset-0.z-50 .grid {
+  min-width: 0;
+}
+
+.bo-contact-grid > *,
+.bo-card-grid > *,
+.bo-skill-wrap > *,
+.bo-hero-grid > *,
+.fixed.inset-0.z-50 .grid > * {
+  min-width: 0;
+}
+
+.bo-contact-line {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.bo-contact-line span {
+  color: var(--bo-text);
+  font-weight: 900;
+}
+
+.bo-contact-line a,
+.whitespace-pre-wrap a {
+  color: #8a5a11;
+  font-weight: 900;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.bo-contact-line a:hover,
+.whitespace-pre-wrap a:hover {
+  color: var(--bo-navy);
+}
+
+.bo-contact-actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.bo-contact-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  width: 100%;
+  border-radius: 10px;
+  background: var(--bo-navy);
+  color: #eef3f7 !important;
+  border: 1px solid rgba(16, 24, 39, 0.16);
+  box-shadow: 0 10px 20px rgba(16, 24, 39, 0.14);
+  font-weight: 900;
+  text-decoration: none;
+  transition: 0.2s ease;
+}
+
+.bo-contact-button:first-child {
+  background: var(--bo-accent);
+  color: #fff7e8 !important;
+}
+
+.bo-contact-button:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+}
+
+.bo-input,
+.bo-btn,
+.bo-small-btn {
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  .bo-page {
+    overflow-x: hidden;
+  }
+
+  .bo-hero-grid,
+  .bo-section-content {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .bo-button-row {
+    width: 100%;
+  }
+
+  .bo-button-row .bo-btn {
+    flex: 1 1 150px;
+    text-align: center;
+  }
+
+  .bo-form,
+  .bo-contact-info {
+    padding: 18px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .bo-hero-grid,
+  .bo-section-content {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .bo-contact-line {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .bo-button-row .bo-btn {
+    flex-basis: 100%;
+  }
+
+  .bo-title {
+    letter-spacing: 0 !important;
   }
 }
