@@ -1,5 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 
@@ -24,503 +23,196 @@ import {
   orderBy,
 } from "firebase/firestore";
 
-const Github = (props) => <span {...props}>⌘</span>;
-const Mail = (props) => <span {...props}>✉</span>;
-const Download = (props) => <span {...props}>⬇</span>;
-const ExternalLink = (props) => <span {...props}>↗</span>;
-const Plus = (props) => <span {...props}>＋</span>;
-const Trash2 = (props) => <span {...props}>🗑</span>;
-const Pencil = (props) => <span {...props}>✎</span>;
-const Save = (props) => <span {...props}>✓</span>;
-const X = (props) => <span {...props}>×</span>;
+/* ─── Icon stubs ─── */
 const User = (props) => <span {...props}>👤</span>;
 const Code2 = (props) => <span {...props}>💻</span>;
 const Award = (props) => <span {...props}>🏆</span>;
 const Briefcase = (props) => <span {...props}>💼</span>;
 const MessageCircle = (props) => <span {...props}>💬</span>;
-const ShieldCheck = (props) => <span {...props}>🛡</span>;
-const Search = (props) => <span {...props}>🔍</span>;
+const Save = (props) => <span {...props}>✓</span>;
+const X = (props) => <span {...props}>×</span>;
+const Plus = (props) => <span {...props}>＋</span>;
+const Trash2 = (props) => <span {...props}>🗑</span>;
+const Pencil = (props) => <span {...props}>✎</span>;
 
+/* ─── Helpers ─── */
 function formatUrl(url) {
-  if (!url || url.trim() === "" || url === "#") {
-    return "#";
-  }
-
-  const cleanUrl = url.trim();
-
-  if (/^https?:\/\//i.test(cleanUrl)) {
-    return cleanUrl;
-  }
-
-  return `https://${cleanUrl}`;
+  if (!url || url.trim() === "" || url === "#") return "#";
+  const c = url.trim();
+  return /^https?:\/\//i.test(c) ? c : `https://${c}`;
 }
-
 function getGoogleDriveFileId(url) {
-  const cleanUrl = (url || "").trim();
-  const patterns = [
+  const c = (url || "").trim();
+  const pats = [
     /drive\.google\.com\/file\/d\/([^/]+)/i,
     /drive\.google\.com\/open\?id=([^&]+)/i,
     /drive\.google\.com\/uc\?id=([^&]+)/i,
     /drive\.google\.com\/thumbnail\?id=([^&]+)/i,
   ];
-
-  for (const pattern of patterns) {
-    const match = cleanUrl.match(pattern);
-
-    if (match?.[1]) {
-      return match[1];
-    }
-  }
-
+  for (const p of pats) { const m = c.match(p); if (m?.[1]) return m[1]; }
   return "";
 }
-
 function formatCertificateImageUrl(url) {
-  const cleanUrl = (url || "").trim();
-  const driveFileId = getGoogleDriveFileId(cleanUrl);
-
-  if (driveFileId) {
-    return `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w1200`;
-  }
-
-  return formatUrl(cleanUrl);
+  const id = getGoogleDriveFileId(url);
+  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1200` : formatUrl(url);
 }
-
-function formatMailto(email) {
-  const cleanEmail = (email || "").trim();
-  return cleanEmail ? `mailto:${cleanEmail}` : "#";
+function formatMailto(e) { const c = (e||"").trim(); return c ? `mailto:${c}` : "#"; }
+function formatInstagramUrl(v) {
+  const c = (v||"").trim();
+  if (!c || c==="#") return "#";
+  if (/^https?:\/\//i.test(c)||/^www\./i.test(c)) return formatUrl(c);
+  return `https://www.instagram.com/${c.replace(/^@/,"")}`;
 }
-
-function formatInstagramUrl(value) {
-  const cleanValue = (value || "").trim();
-
-  if (!cleanValue || cleanValue === "#") {
-    return "#";
-  }
-
-  if (/^https?:\/\//i.test(cleanValue) || /^www\./i.test(cleanValue)) {
-    return formatUrl(cleanValue);
-  }
-
-  return `https://www.instagram.com/${cleanValue.replace(/^@/, "")}`;
-}
-
 function LinkifiedText({ text }) {
-  const value = String(text || "");
-  const pattern =
-    /(https?:\/\/[^\s]+|www\.[^\s]+|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
-  const parts = value.split(pattern);
-
-  return parts.map((part, index) => {
-    if (!part) {
-      return null;
-    }
-
-    if (/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(part)) {
-      return (
-        <a key={`${part}-${index}`} href={formatMailto(part)}>
-          {part}
-        </a>
-      );
-    }
-
-    if (/^(https?:\/\/|www\.)/i.test(part)) {
-      return (
-        <a
-          key={`${part}-${index}`}
-          href={formatUrl(part)}
-          target="_blank"
-          rel="noreferrer"
-        >
-          {part}
-        </a>
-      );
-    }
-
+  const v = String(text||"");
+  const pat = /(https?:\/\/[^\s]+|www\.[^\s]+|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
+  return v.split(pat).map((part,i) => {
+    if (!part) return null;
+    if (/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(part))
+      return <a key={i} href={formatMailto(part)}>{part}</a>;
+    if (/^(https?:\/\/|www\.)/i.test(part))
+      return <a key={i} href={formatUrl(part)} target="_blank" rel="noreferrer">{part}</a>;
     return part;
   });
 }
 
+/* ─── Scroll reveal ─── */
 function useScrollReveal() {
   useEffect(() => {
-    const elements = document.querySelectorAll(
-      ".bo-info-card, .bo-project-card, .bo-skill-card, .bo-cert-card, .bo-form, .bo-contact-info, .bo-map, .bo-photo-wrapper, .bo-certificate-stamp"
-    );
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("reveal-show");
-          }
-        });
-      },
-      {
-        threshold: 0.15,
-      }
-    );
-
-    elements.forEach((element) => {
-      element.classList.add("reveal-hidden");
-      observer.observe(element);
-    });
-
-    return () => {
-      elements.forEach((element) => observer.unobserve(element));
-    };
+    const els = document.querySelectorAll(".reveal-target");
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((e, idx) => {
+        if (e.isIntersecting) {
+          setTimeout(() => e.target.classList.add("revealed"), idx * 80);
+        }
+      });
+    }, { threshold: 0.1 });
+    els.forEach(el => { el.classList.add("not-revealed"); obs.observe(el); });
+    return () => els.forEach(el => obs.unobserve(el));
   }, []);
 }
 
+/* ─── Cube magnetic ─── */
 function useCubeReaction() {
   useEffect(() => {
-    let frameId = 0;
-
-    const resetCube = (cube) => {
-      cube.style.setProperty("--cube-hit-x", "0px");
-      cube.style.setProperty("--cube-hit-y", "0px");
-      cube.style.setProperty("--cube-hit-rotate", "0deg");
-      cube.style.setProperty("--cube-hit-scale", "1");
-      cube.classList.remove("is-hit");
+    let fid = 0;
+    const reset = (c) => {
+      c.style.setProperty("--hx","0px"); c.style.setProperty("--hy","0px");
+      c.style.setProperty("--hr","0deg"); c.style.setProperty("--hs","1");
+      c.classList.remove("is-hit");
     };
-
-    const reactToPointer = (event) => {
-      window.cancelAnimationFrame(frameId);
-
-      frameId = window.requestAnimationFrame(() => {
-        const cubes = document.querySelectorAll(".bo-cube");
-        const isSmallScreen = window.innerWidth <= 700;
-        const threshold = isSmallScreen ? 86 : 130;
-        const maxPush = isSmallScreen ? 34 : 58;
-
-        cubes.forEach((cube) => {
-          const rect = cube.getBoundingClientRect();
-          const cubeX = rect.left + rect.width / 2;
-          const cubeY = rect.top + rect.height / 2;
-          const dx = cubeX - event.clientX;
-          const dy = cubeY - event.clientY;
-          const distance = Math.hypot(dx, dy);
-
-          if (distance > threshold) {
-            resetCube(cube);
-            return;
-          }
-
-          const safeDistance = Math.max(distance, 1);
-          const force = (1 - safeDistance / threshold) * maxPush;
-          const pushX = (dx / safeDistance) * force;
-          const pushY = (dy / safeDistance) * force;
-          const rotate = Math.max(-22, Math.min(22, (pushX - pushY) * 0.5));
-
-          cube.style.setProperty("--cube-hit-x", `${pushX.toFixed(2)}px`);
-          cube.style.setProperty("--cube-hit-y", `${pushY.toFixed(2)}px`);
-          cube.style.setProperty("--cube-hit-rotate", `${rotate.toFixed(2)}deg`);
-          cube.style.setProperty("--cube-hit-scale", "1.08");
+    const react = (ev) => {
+      cancelAnimationFrame(fid);
+      fid = requestAnimationFrame(() => {
+        document.querySelectorAll(".bo-cube").forEach(cube => {
+          const r = cube.getBoundingClientRect();
+          const cx = r.left + r.width/2, cy = r.top + r.height/2;
+          const dx = cx - ev.clientX, dy = cy - ev.clientY;
+          const dist = Math.hypot(dx,dy);
+          const thresh = window.innerWidth<=700 ? 90 : 140;
+          if (dist > thresh) { reset(cube); return; }
+          const f = (1-dist/thresh)*60, safe = Math.max(dist,1);
+          cube.style.setProperty("--hx",`${(dx/safe)*f}px`);
+          cube.style.setProperty("--hy",`${(dy/safe)*f}px`);
+          cube.style.setProperty("--hr",`${Math.max(-25,Math.min(25,(dx-dy)*0.5))}deg`);
+          cube.style.setProperty("--hs","1.1");
           cube.classList.add("is-hit");
         });
       });
     };
-
-    const resetAllCubes = () => {
-      document.querySelectorAll(".bo-cube").forEach(resetCube);
-    };
-
-    window.addEventListener("pointermove", reactToPointer);
-    window.addEventListener("pointerleave", resetAllCubes);
-    window.addEventListener("blur", resetAllCubes);
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      window.removeEventListener("pointermove", reactToPointer);
-      window.removeEventListener("pointerleave", resetAllCubes);
-      window.removeEventListener("blur", resetAllCubes);
-    };
-  }, []);
+    const resetAll = () => document.querySelectorAll(".bo-cube").forEach(reset);
+    window.addEventListener("pointermove", react);
+    window.addEventListener("pointerleave", resetAll);
+    window.addEventListener("blur", resetAll);
+    return () => { cancelAnimationFrame(fid); window.removeEventListener("pointermove",react); window.removeEventListener("pointerleave",resetAll); window.removeEventListener("blur",resetAll); };
+  },[]);
 }
 
+/* ─── Typewriter ─── */
+function useTypewriter(words, speed=80, pause=1800) {
+  const [display, setDisplay] = useState("");
+  const [wIdx, setWIdx] = useState(0);
+  const [cIdx, setCIdx] = useState(0);
+  const [deleting, setDeleting] = useState(false);
+  useEffect(() => {
+    const word = words[wIdx];
+    const timeout = setTimeout(() => {
+      if (!deleting) {
+        setDisplay(word.slice(0, cIdx+1));
+        if (cIdx+1 === word.length) setTimeout(() => setDeleting(true), pause);
+        else setCIdx(c => c+1);
+      } else {
+        setDisplay(word.slice(0, cIdx-1));
+        if (cIdx-1 === 0) { setDeleting(false); setWIdx(w => (w+1)%words.length); setCIdx(0); }
+        else setCIdx(c => c-1);
+      }
+    }, deleting ? speed/2 : speed);
+    return () => clearTimeout(timeout);
+  }, [cIdx, deleting, wIdx, words, speed, pause]);
+  return display;
+}
+
+/* ─── Defaults ─── */
 const defaultProfile = {
-  name: "Ankit",
-  title: "MCA Student • Java Developer • Web Developer",
-  headline: "I build clean and dynamic web projects.",
-  about:
-    "I work with Java Servlet/JSP, React, Python, Django, MySQL and MongoDB. This portfolio shows my projects, skills, certificates and development journey.",
-  education:
-    "MCA student focused on software development, web technologies and real-world projects.",
-  development:
-    "I build projects using Java Servlet/JSP, React, Django, MySQL and MongoDB.",
-  goal:
-    "My goal is to become a confident full-stack developer and build deployable applications.",
-  email: "ga8774040@gmail.com",
-  github: "https://github.com/cskfan07",
-  linkedin:
-    "https://www.linkedin.com/in/ankit-gupta2201?utm_source=share_via&utm_content=profile&utm_medium=member_android",
-  instagram: "mky_2201",
-  resumeUrl: "#",
+  name:"Ankit", title:"MCA Student • Java Developer • Web Developer",
+  headline:"I build clean and dynamic web projects.",
+  about:"I work with Java Servlet/JSP, React, Python, Django, MySQL and MongoDB. This portfolio shows my projects, skills, certificates and development journey.",
+  education:"MCA student focused on software development, web technologies and real-world projects.",
+  development:"I build projects using Java Servlet/JSP, React, Django, MySQL and MongoDB.",
+  goal:"My goal is to become a confident full-stack developer and build deployable applications.",
+  email:"ga8774040@gmail.com", github:"https://github.com/cskfan07",
+  linkedin:"https://www.linkedin.com/in/ankit-gupta2201?utm_source=share_via&utm_content=profile&utm_medium=member_android",
+  instagram:"mky_2201", resumeUrl:"#",
 };
-
 const defaultSkills = [
-  { id: "default-1", name: "Java", category: "Backend" },
-  { id: "default-2", name: "Servlet/JSP", category: "Backend" },
-  { id: "default-3", name: "Python", category: "Backend" },
-  { id: "default-4", name: "Django", category: "Backend" },
-  { id: "default-5", name: "React JS", category: "Frontend" },
-  { id: "default-6", name: "HTML", category: "Frontend" },
-  { id: "default-7", name: "CSS", category: "Frontend" },
-  { id: "default-8", name: "JavaScript", category: "Frontend" },
-  { id: "default-9", name: "MySQL", category: "Database" },
-  { id: "default-10", name: "MongoDB", category: "Database" },
-  { id: "default-11", name: "GitHub", category: "Tools" },
-  { id: "default-12", name: "Power BI", category: "Analytics" },
+  {id:"d1",name:"Java",category:"Backend"},{id:"d2",name:"Servlet/JSP",category:"Backend"},
+  {id:"d3",name:"Python",category:"Backend"},{id:"d4",name:"Django",category:"Backend"},
+  {id:"d5",name:"React JS",category:"Frontend"},{id:"d6",name:"HTML",category:"Frontend"},
+  {id:"d7",name:"CSS",category:"Frontend"},{id:"d8",name:"JavaScript",category:"Frontend"},
+  {id:"d9",name:"MySQL",category:"Database"},{id:"d10",name:"MongoDB",category:"Database"},
+  {id:"d11",name:"GitHub",category:"Tools"},{id:"d12",name:"Power BI",category:"Analytics"},
 ];
-
 const defaultProjects = [
-  {
-    id: "default-project-1",
-    title: "MCA Alumni Connect",
-    description:
-      "A role-based alumni portal with student, alumni and admin dashboards, notifications and job post management.",
-    tech: "Django, MongoDB Atlas, HTML, CSS, JavaScript",
-    github: "#",
-    demo: "https://mca-alumni-connect.onrender.com",
-    image:
-      "https://images.unsplash.com/photo-1551434678-e076c223a692?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    id: "default-project-2",
-    title: "Smart E-Driving Licence System",
-    description:
-      "A web system for learning licence, DL application, document verification, slot booking, exam and QR-based licence validation.",
-    tech: "Java Servlet, JSP, MySQL, Tomcat",
-    github: "#",
-    demo: "#",
-    image:
-      "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    id: "default-project-3",
-    title: "Gud-Madhur AI",
-    description:
-      "A jaggery e-commerce platform with product listing, cart, orders, payments and an AI FAQ chatbot.",
-    tech: "Servlet, JSP, MySQL, JavaScript",
-    github: "#",
-    demo: "#",
-    image:
-      "https://images.unsplash.com/photo-1606787366850-de6330128bfc?q=80&w=1200&auto=format&fit=crop",
-  },
+  {id:"dp1",title:"MCA Alumni Connect",description:"A role-based alumni portal with student, alumni and admin dashboards, notifications and job post management.",tech:"Django, MongoDB Atlas, HTML, CSS, JavaScript",github:"#",demo:"https://mca-alumni-connect.onrender.com",image:"https://images.unsplash.com/photo-1551434678-e076c223a692?q=80&w=1200&auto=format&fit=crop"},
+  {id:"dp2",title:"Smart E-Driving Licence System",description:"A web system for learning licence, DL application, document verification, slot booking, exam and QR-based licence validation.",tech:"Java Servlet, JSP, MySQL, Tomcat",github:"#",demo:"#",image:"https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=1200&auto=format&fit=crop"},
+  {id:"dp3",title:"Gud-Madhur AI",description:"A jaggery e-commerce platform with product listing, cart, orders, payments and an AI FAQ chatbot.",tech:"Servlet, JSP, MySQL, JavaScript",github:"#",demo:"#",image:"https://images.unsplash.com/photo-1606787366850-de6330128bfc?q=80&w=1200&auto=format&fit=crop"},
 ];
-
 const defaultCertificates = [
-  {
-    id: "default-certificate-1",
-    title: "Generative AI 101",
-    provider: "Learning Program",
-    date: "2026",
-    imageUrl: "",
-    credentialUrl: "#",
-  },
-  {
-    id: "default-certificate-2",
-    title: "Digital Edge Program",
-    provider: "Learning Program",
-    date: "2026",
-    imageUrl: "",
-    credentialUrl: "#",
-  },
-  {
-    id: "default-certificate-3",
-    title: "Java Development Practice",
-    provider: "Practice Certificate",
-    date: "2026",
-    imageUrl: "",
-    credentialUrl: "#",
-  },
-  {
-    id: "default-certificate-4",
-    title: "Power BI Basics",
-    provider: "Learning Program",
-    date: "2026",
-    imageUrl: "",
-    credentialUrl: "#",
-  },
+  {id:"dc1",title:"Generative AI 101",provider:"Learning Program",date:"2026",imageUrl:"",credentialUrl:"#"},
+  {id:"dc2",title:"Digital Edge Program",provider:"Learning Program",date:"2026",imageUrl:"",credentialUrl:"#"},
+  {id:"dc3",title:"Java Development Practice",provider:"Practice Certificate",date:"2026",imageUrl:"",credentialUrl:"#"},
+  {id:"dc4",title:"Power BI Basics",provider:"Learning Program",date:"2026",imageUrl:"",credentialUrl:"#"},
 ];
 
+/* ─── Data hooks ─── */
 function useProfile() {
-  const [profile, setProfile] = useState(defaultProfile);
-  const [profileLoading, setProfileLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchProfile = async () => {
+  const [profile,setProfile]=useState(defaultProfile);
+  const [loading,setLoading]=useState(true);
+  useEffect(()=>{
+    (async()=>{
       try {
-        const profileRef = doc(db, "profile", "main");
-        const profileSnap = await getDoc(profileRef);
-
-        if (profileSnap.exists()) {
-          setProfile({
-            ...defaultProfile,
-            ...profileSnap.data(),
-          });
-        } else {
-          await setDoc(profileRef, {
-            ...defaultProfile,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          });
-
-          setProfile(defaultProfile);
-        }
-      } catch (error) {
-        console.error("Profile fetch error:", error);
-        setProfile(defaultProfile);
-      } finally {
-        setProfileLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, []);
-
-  return { profile, setProfile, profileLoading };
+        const ref=doc(db,"profile","main"); const snap=await getDoc(ref);
+        if(snap.exists()) setProfile({...defaultProfile,...snap.data()});
+        else { await setDoc(ref,{...defaultProfile,createdAt:serverTimestamp(),updatedAt:serverTimestamp()}); setProfile(defaultProfile); }
+      } catch { setProfile(defaultProfile); } finally { setLoading(false); }
+    })();
+  },[]);
+  return {profile,setProfile,profileLoading:loading};
 }
-
-function useSkills() {
-  const [skills, setSkills] = useState(defaultSkills);
-  const [skillsLoading, setSkillsLoading] = useState(true);
-
-  const fetchSkills = async () => {
+function useCollection(col,defaults) {
+  const [items,setItems]=useState(defaults);
+  const [loading,setLoading]=useState(true);
+  const fetch=async()=>{
     try {
-      const skillsRef = collection(db, "skills");
-      const skillsQuery = query(skillsRef, orderBy("createdAt", "desc"));
-      const snapshot = await getDocs(skillsQuery);
-
-      if (snapshot.empty) {
-        setSkills(defaultSkills);
-      } else {
-        const skillList = snapshot.docs.map((docItem) => ({
-          id: docItem.id,
-          ...docItem.data(),
-        }));
-
-        setSkills(skillList);
-      }
-    } catch (error) {
-      console.error("Skills fetch error:", error);
-      setSkills(defaultSkills);
-    } finally {
-      setSkillsLoading(false);
-    }
+      const snap=await getDocs(query(collection(db,col),orderBy("createdAt","desc")));
+      setItems(snap.empty?defaults:snap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch { setItems(defaults); } finally { setLoading(false); }
   };
-
-  useEffect(() => {
-    fetchSkills();
-  }, []);
-
-  return { skills, skillsLoading, fetchSkills };
+  useEffect(()=>{fetch();},[]);
+  return {items,loading,fetch};
 }
 
-function useProjects() {
-  const [projects, setProjects] = useState(defaultProjects);
-  const [projectsLoading, setProjectsLoading] = useState(true);
-
-  const fetchProjects = async () => {
-    try {
-      const projectsRef = collection(db, "projects");
-      const projectsQuery = query(projectsRef, orderBy("createdAt", "desc"));
-      const snapshot = await getDocs(projectsQuery);
-
-      if (snapshot.empty) {
-        setProjects(defaultProjects);
-      } else {
-        const projectList = snapshot.docs.map((docItem) => ({
-          id: docItem.id,
-          ...docItem.data(),
-        }));
-
-        setProjects(projectList);
-      }
-    } catch (error) {
-      console.error("Projects fetch error:", error);
-      setProjects(defaultProjects);
-    } finally {
-      setProjectsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
-  return { projects, projectsLoading, fetchProjects };
-}
-
-function useCertificates() {
-  const [certificates, setCertificates] = useState(defaultCertificates);
-  const [certificatesLoading, setCertificatesLoading] = useState(true);
-
-  const fetchCertificates = async () => {
-    try {
-      const certificatesRef = collection(db, "certificates");
-      const certificatesQuery = query(
-        certificatesRef,
-        orderBy("createdAt", "desc")
-      );
-      const snapshot = await getDocs(certificatesQuery);
-
-      if (snapshot.empty) {
-        setCertificates(defaultCertificates);
-      } else {
-        const certificateList = snapshot.docs.map((docItem) => ({
-          id: docItem.id,
-          ...docItem.data(),
-        }));
-
-        setCertificates(certificateList);
-      }
-    } catch (error) {
-      console.error("Certificates fetch error:", error);
-      setCertificates(defaultCertificates);
-    } finally {
-      setCertificatesLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCertificates();
-  }, []);
-
-  return { certificates, certificatesLoading, fetchCertificates };
-}
-
-function useMessages() {
-  const [messages, setMessages] = useState([]);
-  const [messagesLoading, setMessagesLoading] = useState(true);
-
-  const fetchMessages = async () => {
-    try {
-      const messagesRef = collection(db, "messages");
-      const messagesQuery = query(messagesRef, orderBy("createdAt", "desc"));
-      const snapshot = await getDocs(messagesQuery);
-
-      const messageList = snapshot.docs.map((docItem) => ({
-        id: docItem.id,
-        ...docItem.data(),
-      }));
-
-      setMessages(messageList);
-    } catch (error) {
-      console.error("Messages fetch error:", error);
-      setMessages([]);
-    } finally {
-      setMessagesLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchMessages();
-  }, []);
-
-  return { messages, messagesLoading, fetchMessages };
-}
-
-
+/* ─── App ─── */
 export default function App() {
   return (
     <BrowserRouter>
@@ -533,1387 +225,598 @@ export default function App() {
 }
 
 function PortfolioPage() {
-  const [activeSection, setActiveSection] = useState("home");
-  const [search, setSearch] = useState("");
-  const navigate = useNavigate();
-
-  useScrollReveal();
-  useCubeReaction();
-  const { profile, profileLoading } = useProfile();
-  const { skills, skillsLoading } = useSkills();
-  const { projects, projectsLoading } = useProjects();
-  const { certificates, certificatesLoading } = useCertificates();
-
-  const filteredProjects = useMemo(() => {
-    const value = search.toLowerCase();
-
-    return projects.filter(
-      (project) =>
-        project.title?.toLowerCase().includes(value) ||
-        project.tech?.toLowerCase().includes(value) ||
-        project.description?.toLowerCase().includes(value)
-    );
-  }, [projects, search]);
-
-  const scrollToSection = (id) => {
-    setActiveSection(id);
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  if (
-    profileLoading ||
-    skillsLoading ||
-    projectsLoading ||
-    certificatesLoading
-  ) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-white grid place-items-center">
-        Loading portfolio...
-      </div>
-    );
-  }
-
+  const [search,setSearch]=useState("");
+  const navigate=useNavigate();
+  useScrollReveal(); useCubeReaction();
+  const {profile,profileLoading}=useProfile();
+  const {items:skills,loading:sl}=useCollection("skills",defaultSkills);
+  const {items:projects,loading:pl}=useCollection("projects",defaultProjects);
+  const {items:certs,loading:cl}=useCollection("certificates",defaultCertificates);
+  const filtered=useMemo(()=>{
+    const v=search.toLowerCase();
+    return projects.filter(p=>p.title?.toLowerCase().includes(v)||p.tech?.toLowerCase().includes(v)||p.description?.toLowerCase().includes(v));
+  },[projects,search]);
+  if(profileLoading||sl||pl||cl) return <Loader />;
   return (
     <div className="bo-page">
-      <Navbar
-        activeSection={activeSection}
-        scrollToSection={scrollToSection}
-        onAdmin={() => navigate("/admin")}
-      />
-
-      <main className="bo-frame">
-        <Hero scrollToSection={scrollToSection} profile={profile} />
+      <AdminBtn onAdmin={()=>navigate("/admin")} />
+      <main>
+        <Hero profile={profile} />
         <About profile={profile} />
         <Skills skills={skills} />
-        <Projects
-          projects={filteredProjects}
-          search={search}
-          setSearch={setSearch}
-        />
-        <Certificates certificates={certificates} />
+        <Projects projects={filtered} search={search} setSearch={setSearch} />
+        <Certificates certs={certs} />
         <Contact profile={profile} />
       </main>
-
       <Footer />
     </div>
   );
 }
 
 function AdminPage() {
-  const navigate = useNavigate();
+  const navigate=useNavigate();
+  const {profile,setProfile,profileLoading}=useProfile();
+  const {items:skills,loading:sl,fetch:fs}=useCollection("skills",defaultSkills);
+  const {items:projects,loading:pl,fetch:fp}=useCollection("projects",defaultProjects);
+  const {items:certs,loading:cl,fetch:fc}=useCollection("certificates",defaultCertificates);
+  const {items:msgs,loading:ml,fetch:fm}=useCollection("messages",[]);
+  if(profileLoading||sl||pl||cl||ml) return <Loader />;
+  return <AdminPanel projects={projects} fetchProjects={fp} certificates={certs} fetchCertificates={fc} messages={msgs} fetchMessages={fm} profile={profile} setProfile={setProfile} skills={skills} fetchSkills={fs} onClose={()=>navigate("/")} />;
+}
 
-  const { profile, setProfile, profileLoading } = useProfile();
-  const { skills, skillsLoading, fetchSkills } = useSkills();
-  const { projects, projectsLoading, fetchProjects } = useProjects();
-  const { certificates, certificatesLoading, fetchCertificates } =
-    useCertificates();
-  const { messages, messagesLoading, fetchMessages } = useMessages();
-
-  if (
-    profileLoading ||
-    skillsLoading ||
-    projectsLoading ||
-    certificatesLoading ||
-    messagesLoading
-  ) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-white grid place-items-center">
-        Loading admin data...
-      </div>
-    );
-  }
-
+/* ─── Loader ─── */
+function Loader() {
   return (
-    <AdminPanel
-      projects={projects}
-      fetchProjects={fetchProjects}
-      certificates={certificates}
-      fetchCertificates={fetchCertificates}
-      messages={messages}
-      fetchMessages={fetchMessages}
-      profile={profile}
-      setProfile={setProfile}
-      skills={skills}
-      fetchSkills={fetchSkills}
-      onClose={() => navigate("/")}
-    />
+    <div className="loader-screen">
+      <div className="loader-cube" />
+      <p className="loader-text">Loading portfolio…</p>
+    </div>
   );
 }
 
+/* ─── Admin button (fixed) ─── */
+function AdminBtn({onAdmin}) {
+  return <button className="bo-admin" onClick={onAdmin}>Admin</button>;
+}
 
-function Navbar({ activeSection, scrollToSection, onAdmin }) {
+/* ─── HERO ─── */
+function Hero({profile}) {
+  const roles = ["Java Developer","React Builder","Web Developer","MCA Student","Full-Stack Dev"];
+  const typed = useTypewriter(roles);
+  const stats = [
+    {num:"3+",label:"Projects Built"},
+    {num:"12+",label:"Skills Mastered"},
+    {num:"4+",label:"Certificates"},
+  ];
   return (
-    <div className="bo-screen bo-nav-screen">
-      <div className="bo-paper bo-nav-paper">
-        <button className="bo-menu" onClick={() => scrollToSection("home")}>
-          ≡
-        </button>
-        <div className="bo-brand">
-          Black<span>Orange</span>
+    <section id="home" className="hero-section">
+      {/* animated bg orbs */}
+      <div className="hero-orb orb1" />
+      <div className="hero-orb orb2" />
+      <div className="hero-orb orb3" />
+
+      <div className="hero-inner">
+        {/* left */}
+        <div className="hero-left">
+          <div className="hero-badge">
+            <span className="badge-dot" />
+            <span>Available for opportunities</span>
+          </div>
+
+          <h1 className="hero-name">
+            Hi, I'm<br/>
+            <span className="name-accent">{profile.name?.toUpperCase()}</span>
+          </h1>
+
+          <div className="hero-role-line">
+            <span className="role-prefix">I'm a </span>
+            <span className="role-typed">{typed}<span className="cursor">|</span></span>
+          </div>
+
+          <p className="hero-tagline">{profile.headline}</p>
+          <p className="hero-about-mini">{profile.about}</p>
+
+          <div className="hero-actions">
+            <a className="cta-primary" href="#projects">View Projects</a>
+            <a className="cta-secondary" href="#contact">Contact Me</a>
+            <a className="cta-ghost" href={formatUrl(profile.resumeUrl)} target="_blank" rel="noreferrer">Resume ↗</a>
+          </div>
+
+          <div className="hero-stats">
+            {stats.map(s=>(
+              <div key={s.label} className="stat-item">
+                <span className="stat-num">{s.num}</span>
+                <span className="stat-label">{s.label}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="hero-socials">
+            <a href={formatUrl(profile.github)} target="_blank" rel="noreferrer" className="social-pill">GitHub</a>
+            <a href={formatUrl(profile.linkedin)} target="_blank" rel="noreferrer" className="social-pill">LinkedIn</a>
+            <a href={formatMailto(profile.email)} className="social-pill">Email</a>
+            <a href={formatInstagramUrl(profile.instagram)} target="_blank" rel="noreferrer" className="social-pill">Instagram</a>
+          </div>
         </div>
-        <button className="bo-admin" onClick={onAdmin}>
-          Admin
-        </button>
+
+        {/* right - illustration */}
+        <div className="hero-right">
+          <div className="hero-card-frame">
+            <div className="frame-grid-bg" />
+            <div className="profile-circle">
+              <img src="/images/ankit-p.png" alt="Ankit Kumar Gupta" className="profile-photo" onError={e=>e.target.style.display='none'} />
+              <div className="profile-fallback">AK</div>
+            </div>
+            <div className="stamp-badge">MKY_2201</div>
+            <div className="tech-tag t1">Java</div>
+            <div className="tech-tag t2">React</div>
+            <div className="tech-tag t3">Python</div>
+            <div className="tech-tag t4">Django</div>
+          </div>
+        </div>
       </div>
+
+      {/* floating cubes */}
       <span className="bo-cube one" />
       <span className="bo-cube two" />
-    </div>
-  );
-}
+      <span className="bo-cube three" />
 
-
-function SectionTitle({ icon: Icon, title, subtitle }) {
-  return (
-    <div className="mb-10 text-center">
-      <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-blue-500/20 text-blue-300">
-        <Icon size={24} />
-      </div>
-      <h2 className="text-3xl font-bold md:text-4xl">{title}</h2>
-      <p className="mx-auto mt-3 max-w-2xl text-slate-400">{subtitle}</p>
-    </div>
-  );
-}
-
-function Hero({ scrollToSection, profile }) {
-  return (
-    <section id="home" className="bo-screen">
-      <div className="bo-paper">
-        <button className="bo-menu">≡</button>
-        <div className="bo-brand">
-          Black<span>Orange</span>
-        </div>
-
-        <div className="bo-social">
-          <a href={formatUrl(profile.github)} target="_blank" rel="noreferrer">
-            GH
-          </a>
-          <a href={formatUrl(profile.linkedin)} target="_blank" rel="noreferrer">
-            in
-          </a>
-          <a href={formatMailto(profile.email)}>@</a>
-        </div>
-
-        <div className="bo-side-text">PORTFOLIO</div>
-
-        <div className="bo-hero-grid">
-          <motion.div
-            initial={{ opacity: 0, y: 25 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <p className="bo-kicker">Welcome</p>
-            <h1 className="bo-title">
-              I'm <span className="accent">{profile.name}</span> and I'm a
-              software developer.
-            </h1>
-            <p className="bo-desc">
-              {profile.about}
-            </p>
-
-            <div className="bo-button-row">
-              <button className="bo-btn" onClick={() => scrollToSection("projects")}>
-                Learn more
-              </button>
-              <button className="bo-btn secondary" onClick={() => scrollToSection("contact")}>
-                Contact me
-              </button>
-              <a className="bo-btn secondary" href={formatUrl(profile.resumeUrl)} target="_blank" rel="noreferrer">
-                Resume
-              </a>
-            </div>
-
-            <p className="bo-desc bo-desc-small">
-              Bridging MCA theory with code. Focused on Java, Python, React,
-              Firebase and full stack development.
-            </p>
-          </motion.div>
-
-          <motion.div
-            className="bo-illustration"
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-          >
-            <div className="bo-certificate-stamp">MKY_2201</div>
-            <div className="bo-avatar" />
-            <div className="bo-laptop" />
-            <img
-  src="/images/ankit-p.png"
-  alt="Ankit Kumar Gupta"
-  className="bo-profile-img-slide"
-/>
-          </motion.div>
-        </div>
-
-        <span className="bo-cube one" />
-        <span className="bo-cube two" />
-        <span className="bo-cube three" />
-      </div>
+      {/* scroll cue */}
+      <a href="#about" className="scroll-cue">
+        <span className="scroll-line" />
+        <span className="scroll-label">Scroll</span>
+      </a>
     </section>
   );
 }
 
-
-function About({ profile }) {
-  return (
-    <section id="about" className="bo-screen">
-      <div className="bo-paper">
-        <button className="bo-menu">≡</button>
-        <div className="bo-brand">
-          Black<span>Orange</span>
-        </div>
-        <div className="bo-social">
-          <a href={formatUrl(profile.github)} target="_blank" rel="noreferrer">GH</a>
-          <a href={formatUrl(profile.linkedin)} target="_blank" rel="noreferrer">in</a>
-          <a href={formatMailto(profile.email)}>@</a>
-        </div>
-        <div className="bo-side-text">ABOUT</div>
-
-        <div className="bo-section-content">
-          <h2 className="bo-section-title">About</h2>
-          <p className="bo-section-subtitle">
-            A quick view of my education, development focus and career goal.
-          </p>
-
-          <div className="bo-card-grid">
-            {[
-              ["Education", profile.education],
-              ["Development", profile.development],
-              ["Goal", profile.goal],
-            ].map(([title, text]) => (
-              <motion.div
-                key={title}
-                className="bo-info-card bo-card-body"
-                initial={{ opacity: 0, y: 18 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-              >
-                <h3 className="bo-card-title">{title}</h3>
-                <p className="bo-card-text">{text}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        <span className="bo-cube one" />
-        <span className="bo-cube two" />
-      </div>
-    </section>
-  );
-}
-
-
-function Skills({ skills }) {
-  const categories = [...new Set(skills.map((skill) => skill.category || "Other"))];
-
-  return (
-    <section id="skills" className="bo-screen">
-      <div className="bo-paper">
-        <button className="bo-menu">≡</button>
-        <div className="bo-social">
-          <a href="#home">H</a>
-          <a href="#projects">P</a>
-          <a href="#contact">C</a>
-        </div>
-        <div className="bo-side-text">SKILLS</div>
-
-        <div className="bo-section-content">
-          <h2 className="bo-section-title">Skills</h2>
-          <p className="bo-section-subtitle">
-            My technology stack grouped by category.
-          </p>
-
-          <div className="bo-skill-wrap">
-            {categories.map((category) => (
-              <motion.div
-                key={category}
-                className="bo-skill-card"
-                initial={{ opacity: 0, y: 18 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-              >
-                <h3 className="bo-skill-title">{category}</h3>
-                <div className="bo-pills">
-                  {skills
-                    .filter((skill) => (skill.category || "Other") === category)
-                    .map((skill) => (
-                      <span key={skill.id} className="bo-pill">
-                        {skill.name}
-                      </span>
-                    ))}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        <span className="bo-cube one" />
-        <span className="bo-cube two" />
-      </div>
-    </section>
-  );
-}
-
-
-function Projects({ projects, search, setSearch }) {
-  return (
-    <section id="projects" className="bo-screen">
-      <div className="bo-paper">
-        <button className="bo-menu">≡</button>
-        <div className="bo-brand">
-          Black<span>Orange</span>
-        </div>
-
-        <div className="bo-section-content bo-section-content-wide">
-          <h2 className="bo-section-title">Projects</h2>
-          <p className="bo-section-subtitle">
-            Dashboard systems, e-commerce apps and full-stack academic projects.
-          </p>
-
-          <div className="bo-search-box">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search projects by title or technology..."
-              className="bo-input"
-            />
-          </div>
-
-          <div className="bo-card-grid">
-            {projects.map((project) => (
-              <motion.article
-                key={project.id}
-                className="bo-project-card"
-                initial={{ opacity: 0, y: 18 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-              >
-                <img
-                  src={
-                    project.image ||
-                    "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop"
-                  }
-                  alt={project.title}
-                  className="bo-project-img"
-                />
-                <div className="bo-card-body">
-                  <h3 className="bo-card-title">{project.title}</h3>
-                  <p className="bo-card-text">{project.description}</p>
-                  <p className="bo-tech">• {project.tech}</p>
-
-                  <div className="bo-link-row">
-                    <a className="bo-small-btn dark" href={formatUrl(project.github)} target="_blank" rel="noreferrer">
-                      Code
-                    </a>
-                    <a className="bo-small-btn" href={formatUrl(project.demo)} target="_blank" rel="noreferrer">
-                      Live
-                    </a>
-                  </div>
-                </div>
-              </motion.article>
-            ))}
-          </div>
-        </div>
-
-        <span className="bo-cube one" />
-        <span className="bo-cube two" />
-      </div>
-    </section>
-  );
-}
-
-
-function Certificates({ certificates }) {
-  return (
-    <section id="certificates" className="bo-screen">
-      <div className="bo-paper">
-        <button className="bo-menu">≡</button>
-        <div className="bo-section-content bo-section-content-wide">
-          <h2 className="bo-section-title">Certificates</h2>
-          <p className="bo-section-subtitle">
-            Certificates and achievements from learning programs and events.
-          </p>
-
-          <div className="bo-card-grid">
-            {certificates.map((cert) => (
-              <motion.div
-                key={cert.id}
-                className="bo-cert-card"
-                initial={{ opacity: 0, y: 18 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-              >
-                {cert.imageUrl ? (
-                  <img
-                    src={formatCertificateImageUrl(cert.imageUrl)}
-                    alt={cert.title}
-                    className="bo-project-img"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="bo-project-img bo-cert-placeholder">
-                    🏆
-                  </div>
-                )}
-
-                <div className="bo-card-body">
-                  <h3 className="bo-card-title">{cert.title}</h3>
-                  <p className="bo-card-text">{cert.provider}</p>
-                  <p className="bo-tech">• {cert.date}</p>
-
-                  {cert.credentialUrl && cert.credentialUrl !== "#" && (
-                    <a className="bo-small-btn" href={formatUrl(cert.credentialUrl)} target="_blank" rel="noreferrer">
-                      View Credential
-                    </a>
-                  )}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        <span className="bo-cube one" />
-        <span className="bo-cube two" />
-      </div>
-    </section>
-  );
-}
-
-
-function Contact({ profile }) {
-  const [contactForm, setContactForm] = useState({
-    name: "",
-    email: "",
-    message: "",
-  });
-  const [contactStatus, setContactStatus] = useState("");
-  const [contactLoading, setContactLoading] = useState(false);
-
-  const handleContactChange = (field, value) => {
-    setContactForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const saveMessage = async () => {
-    if (
-      !contactForm.name.trim() ||
-      !contactForm.email.trim() ||
-      !contactForm.message.trim()
-    ) {
-      setContactStatus("Please fill name, email and message.");
-      return;
-    }
-
-    try {
-      setContactLoading(true);
-      setContactStatus("");
-
-      await addDoc(collection(db, "messages"), {
-        name: contactForm.name.trim(),
-        email: contactForm.email.trim(),
-        message: contactForm.message.trim(),
-        status: "new",
-        createdAt: serverTimestamp(),
-      });
-
-      setContactForm({
-        name: "",
-        email: "",
-        message: "",
-      });
-
-      setContactStatus("Message sent successfully!");
-    } catch (error) {
-      console.error("Message save error:", error);
-      setContactStatus("Failed to send message. Try again.");
-    } finally {
-      setContactLoading(false);
-
-      setTimeout(() => {
-        setContactStatus("");
-      }, 3000);
-    }
-  };
-
-  return (
-    <section id="contact" className="bo-screen">
-      <div className="bo-paper">
-        <button className="bo-menu">≡</button>
-        <div className="bo-brand">
-          Black<span>Orange</span>
-        </div>
-        <div className="bo-social">
-          <a href={formatUrl(profile.github)} target="_blank" rel="noreferrer">GH</a>
-          <a href={formatUrl(profile.linkedin)} target="_blank" rel="noreferrer">in</a>
-          <a href={formatMailto(profile.email)}>@</a>
-        </div>
-        <div className="bo-side-text">MESSAGE</div>
-
-        <div className="bo-section-content">
-          <h2 className="bo-section-title">Message Me</h2>
-
-          <div className="bo-contact-grid">
-            <div className="bo-form">
-              <div className="bo-form-group">
-                <label>Name</label>
-                <input
-                  value={contactForm.name}
-                  onChange={(e) => handleContactChange("name", e.target.value)}
-                  className="bo-input"
-                />
-              </div>
-
-              <div className="bo-form-group">
-                <label>Email</label>
-                <input
-                  value={contactForm.email}
-                  onChange={(e) => handleContactChange("email", e.target.value)}
-                  className="bo-input"
-                />
-              </div>
-
-              <div className="bo-form-group">
-                <label>Message</label>
-                <textarea
-                  value={contactForm.message}
-                  onChange={(e) => handleContactChange("message", e.target.value)}
-                  className="bo-input bo-message-area"
-                />
-              </div>
-
-              <button className="bo-btn" onClick={saveMessage} disabled={contactLoading}>
-                {contactLoading ? "Sending..." : "Send"}
-              </button>
-
-              {contactStatus && (
-                <p className="bo-card-text">{contactStatus}</p>
-              )}
-            </div>
-
-            <div>
-              <div className="bo-info-card bo-contact-info">
-                <h3 className="bo-card-title">Personal Info</h3>
-                <div className="bo-contact-actions">
-                  <a
-                    className="bo-contact-button"
-                    href={formatUrl(profile.linkedin)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    LinkedIn
-                  </a>
-                  <a
-                    className="bo-contact-button"
-                    href={formatUrl(profile.github)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    GitHub
-                  </a>
-                  <a
-                    className="bo-contact-button"
-                    href={formatInstagramUrl(profile.instagram)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Instagram
-                  </a>
-                  <a
-                    className="bo-contact-button"
-                    href={formatMailto(profile.email)}
-                  >
-                    Email
-                  </a>
-                </div>
-              </div>
-
-              <div className="bo-map">
-                Based in India
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <span className="bo-cube one" />
-        <span className="bo-cube two" />
-      </div>
-    </section>
-  );
-}
-
-
-function AdminPanel({
-  projects,
-  fetchProjects,
-  certificates,
-  fetchCertificates,
-  messages,
-  fetchMessages,
-  profile,
-  setProfile,
-  skills,
-  fetchSkills,
-  onClose,
-}) {
-  const emptyProject = {
-    title: "",
-    description: "",
-    tech: "",
-    github: "",
-    demo: "",
-    image: "",
-  };
-
-  const emptyCertificate = {
-    title: "",
-    provider: "",
-    date: "",
-    imageUrl: "",
-    credentialUrl: "",
-  };
-
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [loginData, setLoginData] = useState({ email: "", password: "" });
-  const [loginError, setLoginError] = useState("");
-
-  const [form, setForm] = useState(emptyProject);
-  const [editingId, setEditingId] = useState(null);
-  const [projectMessage, setProjectMessage] = useState("");
-
-  const [certificateForm, setCertificateForm] = useState(emptyCertificate);
-  const [editingCertificateId, setEditingCertificateId] = useState(null);
-  const [certificateMessage, setCertificateMessage] = useState("");
-
-  const [profileForm, setProfileForm] = useState(profile);
-  const [profileMessage, setProfileMessage] = useState("");
-
-  const [skillForm, setSkillForm] = useState({
-    name: "",
-    category: "",
-  });
-  const [editingSkillId, setEditingSkillId] = useState(null);
-  const [skillMessage, setSkillMessage] = useState("");
-  const [messageAdminStatus, setMessageAdminStatus] = useState("");
-  const [activeAdminTab, setActiveAdminTab] = useState("profile");
-
-  const adminTabs = [
-    { id: "profile", label: "Profile", icon: User },
-    { id: "skills", label: "Skills", icon: Code2 },
-    { id: "projects", label: "Projects", icon: Briefcase },
-    { id: "certificates", label: "Certificates", icon: Award },
-    { id: "messages", label: "Messages", icon: MessageCircle },
+/* ─── ABOUT ─── */
+function About({profile}) {
+  const cards = [
+    {icon:"🎓",title:"Education",text:profile.education,color:"#b18025"},
+    {icon:"⚙️",title:"Development",text:profile.development,color:"#31596b"},
+    {icon:"🎯",title:"Goal",text:profile.goal,color:"#3d6b31"},
   ];
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsLoggedIn(!!user);
-      setAuthLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const handleAdminLogin = async () => {
-    try {
-      setLoginError("");
-
-      await signInWithEmailAndPassword(
-        auth,
-        loginData.email.trim(),
-        loginData.password.trim()
-      );
-    } catch (error) {
-      console.error(error);
-      setLoginError("Invalid email or password");
-    }
-  };
-
-  const handleAdminLogout = async () => {
-    try {
-      await signOut(auth);
-      setLoginData({ email: "", password: "" });
-      onClose();
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleCertificateChange = (field, value) => {
-    setCertificateForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleProfileChange = (field, value) => {
-    setProfileForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const saveProfile = async () => {
-    try {
-      const profileRef = doc(db, "profile", "main");
-
-      await setDoc(
-        profileRef,
-        {
-          ...profileForm,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      setProfile(profileForm);
-      setProfileMessage("Profile updated successfully!");
-
-      setTimeout(() => {
-        setProfileMessage("");
-      }, 2500);
-    } catch (error) {
-      console.error("Profile update error:", error);
-      setProfileMessage("Failed to update profile.");
-    }
-  };
-
-  const saveSkill = async () => {
-    if (!skillForm.name.trim() || !skillForm.category.trim()) {
-      setSkillMessage("Please fill skill name and category.");
-      return;
-    }
-
-    try {
-      if (editingSkillId) {
-        const skillRef = doc(db, "skills", editingSkillId);
-
-        await updateDoc(skillRef, {
-          name: skillForm.name.trim(),
-          category: skillForm.category.trim(),
-          updatedAt: serverTimestamp(),
-        });
-
-        setSkillMessage("Skill updated successfully!");
-      } else {
-        await addDoc(collection(db, "skills"), {
-          name: skillForm.name.trim(),
-          category: skillForm.category.trim(),
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-
-        setSkillMessage("Skill added successfully!");
-      }
-
-      setSkillForm({ name: "", category: "" });
-      setEditingSkillId(null);
-      await fetchSkills();
-
-      setTimeout(() => {
-        setSkillMessage("");
-      }, 2500);
-    } catch (error) {
-      console.error("Skill save error:", error);
-      setSkillMessage("Failed to save skill.");
-    }
-  };
-
-  const editSkill = (skill) => {
-    setEditingSkillId(skill.id);
-    setSkillForm({
-      name: skill.name,
-      category: skill.category,
-    });
-  };
-
-  const deleteSkill = async (skillId) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this skill?"
-    );
-
-    if (!confirmDelete) return;
-
-    if (String(skillId).startsWith("default-")) {
-      setSkillMessage("Default skills cannot be deleted. Add Firebase skills first.");
-      return;
-    }
-
-    try {
-      await deleteDoc(doc(db, "skills", skillId));
-      await fetchSkills();
-      setSkillMessage("Skill deleted successfully!");
-
-      setTimeout(() => {
-        setSkillMessage("");
-      }, 2500);
-    } catch (error) {
-      console.error("Skill delete error:", error);
-      setSkillMessage("Failed to delete skill.");
-    }
-  };
-
-  const saveProject = async () => {
-    if (!form.title.trim() || !form.description.trim() || !form.tech.trim()) {
-      setProjectMessage("Please fill title, description and technology fields.");
-      return;
-    }
-
-    try {
-      if (editingId) {
-        const projectRef = doc(db, "projects", editingId);
-
-        await updateDoc(projectRef, {
-          title: form.title.trim(),
-          description: form.description.trim(),
-          tech: form.tech.trim(),
-          github: form.github.trim() || "#",
-          demo: form.demo.trim() || "#",
-          image:
-            form.image.trim() ||
-            "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop",
-          updatedAt: serverTimestamp(),
-        });
-
-        setProjectMessage("Project updated successfully!");
-      } else {
-        await addDoc(collection(db, "projects"), {
-          title: form.title.trim(),
-          description: form.description.trim(),
-          tech: form.tech.trim(),
-          github: form.github.trim() || "#",
-          demo: form.demo.trim() || "#",
-          image:
-            form.image.trim() ||
-            "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop",
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-
-        setProjectMessage("Project added successfully!");
-      }
-
-      setForm(emptyProject);
-      setEditingId(null);
-      await fetchProjects();
-
-      setTimeout(() => {
-        setProjectMessage("");
-      }, 2500);
-    } catch (error) {
-      console.error("Project save error:", error);
-      setProjectMessage("Failed to save project.");
-    }
-  };
-
-  const editProject = (project) => {
-    if (String(project.id).startsWith("default-project-")) {
-      setProjectMessage("Default project cannot be edited. Add Firebase project first.");
-      return;
-    }
-
-    setEditingId(project.id);
-
-    setForm({
-      title: project.title || "",
-      description: project.description || "",
-      tech: project.tech || "",
-      github: project.github || "",
-      demo: project.demo || "",
-      image: project.image || "",
-    });
-  };
-
-  const deleteProject = async (id) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this project?"
-    );
-
-    if (!confirmDelete) return;
-
-    if (String(id).startsWith("default-project-")) {
-      setProjectMessage("Default project cannot be deleted. Add Firebase project first.");
-      return;
-    }
-
-    try {
-      await deleteDoc(doc(db, "projects", id));
-      await fetchProjects();
-      setProjectMessage("Project deleted successfully!");
-
-      setTimeout(() => {
-        setProjectMessage("");
-      }, 2500);
-    } catch (error) {
-      console.error("Project delete error:", error);
-      setProjectMessage("Failed to delete project.");
-    }
-  };
-
-  const saveCertificate = async () => {
-    if (!certificateForm.title.trim()) {
-      setCertificateMessage("Please fill certificate title.");
-      return;
-    }
-
-    try {
-      if (editingCertificateId) {
-        const certificateRef = doc(db, "certificates", editingCertificateId);
-
-        await updateDoc(certificateRef, {
-          title: certificateForm.title.trim(),
-          provider: certificateForm.provider.trim(),
-          date: certificateForm.date.trim(),
-          imageUrl: certificateForm.imageUrl.trim(),
-          credentialUrl: certificateForm.credentialUrl.trim() || "#",
-          updatedAt: serverTimestamp(),
-        });
-
-        setCertificateMessage("Certificate updated successfully!");
-      } else {
-        await addDoc(collection(db, "certificates"), {
-          title: certificateForm.title.trim(),
-          provider: certificateForm.provider.trim(),
-          date: certificateForm.date.trim(),
-          imageUrl: certificateForm.imageUrl.trim(),
-          credentialUrl: certificateForm.credentialUrl.trim() || "#",
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-
-        setCertificateMessage("Certificate added successfully!");
-      }
-
-      setCertificateForm(emptyCertificate);
-      setEditingCertificateId(null);
-      await fetchCertificates();
-
-      setTimeout(() => {
-        setCertificateMessage("");
-      }, 2500);
-    } catch (error) {
-      console.error("Certificate save error:", error);
-      setCertificateMessage("Failed to save certificate.");
-    }
-  };
-
-  const editCertificate = (cert) => {
-    if (String(cert.id).startsWith("default-certificate-")) {
-      setCertificateMessage(
-        "Default certificate cannot be edited. Add Firebase certificate first."
-      );
-      return;
-    }
-
-    setEditingCertificateId(cert.id);
-
-    setCertificateForm({
-      title: cert.title || "",
-      provider: cert.provider || "",
-      date: cert.date || "",
-      imageUrl: cert.imageUrl || "",
-      credentialUrl: cert.credentialUrl || "",
-    });
-  };
-
-  const deleteCertificate = async (id) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this certificate?"
-    );
-
-    if (!confirmDelete) return;
-
-    if (String(id).startsWith("default-certificate-")) {
-      setCertificateMessage(
-        "Default certificate cannot be deleted. Add Firebase certificate first."
-      );
-      return;
-    }
-
-    try {
-      await deleteDoc(doc(db, "certificates", id));
-      await fetchCertificates();
-      setCertificateMessage("Certificate deleted successfully!");
-
-      setTimeout(() => {
-        setCertificateMessage("");
-      }, 2500);
-    } catch (error) {
-      console.error("Certificate delete error:", error);
-      setCertificateMessage("Failed to delete certificate.");
-    }
-  };
-
-  const markMessageAsRead = async (messageId) => {
-    try {
-      await updateDoc(doc(db, "messages", messageId), {
-        status: "read",
-        updatedAt: serverTimestamp(),
-      });
-
-      await fetchMessages();
-      setMessageAdminStatus("Message marked as read.");
-
-      setTimeout(() => {
-        setMessageAdminStatus("");
-      }, 2500);
-    } catch (error) {
-      console.error("Message update error:", error);
-      setMessageAdminStatus("Failed to update message.");
-    }
-  };
-
-  const deleteMessage = async (messageId) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this message?"
-    );
-
-    if (!confirmDelete) return;
-
-    try {
-      await deleteDoc(doc(db, "messages", messageId));
-      await fetchMessages();
-      setMessageAdminStatus("Message deleted successfully.");
-
-      setTimeout(() => {
-        setMessageAdminStatus("");
-      }, 2500);
-    } catch (error) {
-      console.error("Message delete error:", error);
-      setMessageAdminStatus("Failed to delete message.");
-    }
-  };
-
-  const formatMessageDate = (createdAt) => {
-    if (!createdAt?.toDate) {
-      return "No date";
-    }
-
-    return createdAt.toDate().toLocaleString();
-  };
-
-  if (authLoading) {
-    return (
-      <div className="bo-admin-shell fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
-        <div className="bo-admin-loading-card rounded-3xl border border-white/10 bg-slate-950 p-6 text-white shadow-2xl">
-          Checking admin login...
+  return (
+    <section id="about" className="section about-section">
+      <div className="section-inner">
+        <div className="section-label reveal-target">About Me</div>
+        <h2 className="section-title reveal-target">Who I Am</h2>
+        <p className="section-subtitle reveal-target">A quick view into my education, focus and career ambitions.</p>
+
+        <div className="about-grid">
+          {cards.map((c,i)=>(
+            <div key={c.title} className={`about-card reveal-target`} style={{"--accent":c.color,"--delay":`${i*120}ms`}}>
+              <div className="about-card-icon">{c.icon}</div>
+              <h3 className="about-card-title">{c.title}</h3>
+              <p className="about-card-text">{c.text}</p>
+              <div className="about-card-bar" />
+            </div>
+          ))}
         </div>
       </div>
-    );
-  }
+      <span className="bo-cube one" /><span className="bo-cube two" />
+    </section>
+  );
+}
 
-  if (!isLoggedIn) {
-    return (
-      <div className="bo-admin-shell fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
-        <div className="bo-admin-login-card w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">Admin Login</h2>
-              <p className="mt-2 text-sm text-slate-400">
-                Login using Firebase Authentication admin account.
-              </p>
+/* ─── SKILLS ─── */
+function Skills({skills}) {
+  const categories=[...new Set(skills.map(s=>s.category||"Other"))];
+  const featuredSkills = [
+    ...skills.filter(s => /react/i.test(s.name || "")).map(s => s.name),
+    ...skills.map(s => s.name),
+  ].filter(Boolean).filter((name, index, arr) => arr.indexOf(name) === index).slice(0, 5);
+  const categoryIcons = {Backend:"⚙️",Frontend:"🎨",Database:"🗄️",Tools:"🔧",Analytics:"📊",Other:"💡"};
+  return (
+    <section id="skills" className="section skills-section">
+      <div className="section-inner">
+        <div className="section-label reveal-target">My Stack</div>
+        <h2 className="section-title reveal-target">Skills & Technologies</h2>
+        <p className="section-subtitle reveal-target">Technology I work with, grouped by domain.</p>
+        <SectionMascot mode="skills" items={featuredSkills} />
+
+        <div className="skills-grid">
+          {categories.map((cat,ci)=>(
+            <div key={cat} className="skill-card reveal-target" style={{"--delay":`${ci*100}ms`}}>
+              <div className="skill-card-header">
+                <span className="skill-cat-icon">{categoryIcons[cat]||"💡"}</span>
+                <h3 className="skill-cat-title">{cat}</h3>
+              </div>
+              <div className="skill-pills">
+                {skills.filter(s=>(s.category||"Other")===cat).map(s=>(
+                  <span key={s.id} className="skill-pill">{s.name}</span>
+                ))}
+              </div>
             </div>
+          ))}
+        </div>
+      </div>
+      <span className="bo-cube one" /><span className="bo-cube two" />
+    </section>
+  );
+}
 
-            <button
-              onClick={onClose}
-              className="rounded-2xl bg-white/10 p-3 hover:bg-white hover:text-slate-950"
-            >
-              <X />
-            </button>
-          </div>
+/* ─── PROJECTS ─── */
+function Projects({projects,search,setSearch}) {
+  return (
+    <section id="projects" className="section projects-section">
+      <div className="section-inner">
+        <div className="section-label reveal-target">Portfolio</div>
+        <h2 className="section-title reveal-target">Projects</h2>
+        <p className="section-subtitle reveal-target">Dashboard systems, e-commerce apps and full-stack academic projects.</p>
+        <SectionMascot mode="projects" />
 
-          <div className="space-y-4">
-            <input
-              type="email"
-              value={loginData.email}
-              onChange={(e) =>
-                setLoginData({ ...loginData, email: e.target.value })
-              }
-              placeholder="Admin Email"
-              className="admin-input"
-            />
+        <div className="search-wrap reveal-target">
+          <span className="search-icon">🔍</span>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by title, tech, or description…" className="search-input" />
+          {search && <button className="search-clear" onClick={()=>setSearch("")}>×</button>}
+        </div>
 
-            <input
-              type="password"
-              value={loginData.password}
-              onChange={(e) =>
-                setLoginData({ ...loginData, password: e.target.value })
-              }
-              placeholder="Admin Password"
-              className="admin-input"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  handleAdminLogin();
+        {projects.length===0
+          ? <div className="no-results">No projects match "<strong>{search}</strong>"</div>
+          : <div className="projects-grid">
+              {projects.map((p,i)=>(
+                <article key={p.id} className="project-card reveal-target" style={{"--delay":`${i*120}ms`}}>
+                  <div className="project-img-wrap">
+                    <img src={p.image||"https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop"} alt={p.title} className="project-img" />
+                    <div className="project-img-overlay">
+                      <a href={formatUrl(p.github)} target="_blank" rel="noreferrer" className="overlay-btn">Code ⌘</a>
+                      <a href={formatUrl(p.demo)} target="_blank" rel="noreferrer" className="overlay-btn accent">Live ↗</a>
+                    </div>
+                  </div>
+                  <div className="project-body">
+                    <h3 className="project-title">{p.title}</h3>
+                    <p className="project-desc">{p.description}</p>
+                    <div className="project-tech">
+                      {p.tech.split(",").map(t=><span key={t} className="tech-badge">{t.trim()}</span>)}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+        }
+      </div>
+      <span className="bo-cube one" /><span className="bo-cube two" />
+    </section>
+  );
+}
+
+/* ─── CERTIFICATES ─── */
+function SectionMascot({ mode, items=[] }) {
+  const isSkills = mode === "skills";
+  const boardItems = isSkills ? items : ["Code", "Live", "Search"];
+  return (
+    <div className={`guide-scene guide-${mode} reveal-target`}>
+      <div className="guide-boy" aria-hidden="true">
+        <div className="guide-hair" />
+        <div className="guide-head">
+          <span className="guide-eye left" />
+          <span className="guide-eye right" />
+          <span className="guide-smile" />
+        </div>
+        <div className="guide-body">
+          <span className="guide-arm left" />
+          <span className="guide-arm right" />
+        </div>
+        <span className="guide-leg left" />
+        <span className="guide-leg right" />
+      </div>
+      <div className="guide-board">
+        <div className="guide-board-title">{isSkills ? "Skill List" : "Project Actions"}</div>
+        <div className="guide-board-items">
+          {boardItems.map(item => <span key={item}>{item}</span>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Certificates({certs}) {
+  return (
+    <section id="certificates" className="section certs-section">
+      <div className="section-inner">
+        <div className="section-label reveal-target">Achievements</div>
+        <h2 className="section-title reveal-target">Certificates</h2>
+        <p className="section-subtitle reveal-target">Certificates and achievements from learning programs and events.</p>
+
+        <div className="certs-grid">
+          {certs.map((c,i)=>(
+            <div key={c.id} className="cert-card reveal-target" style={{"--delay":`${i*100}ms`}}>
+              <div className="cert-img-wrap">
+                {c.imageUrl
+                  ? <img src={formatCertificateImageUrl(c.imageUrl)} alt={c.title} className="cert-img" referrerPolicy="no-referrer" />
+                  : <div className="cert-placeholder"><span>🏆</span></div>
                 }
-              }}
-            />
+              </div>
+              <div className="cert-body">
+                <h3 className="cert-title">{c.title}</h3>
+                <p className="cert-provider">{c.provider}</p>
+                <span className="cert-date">{c.date}</span>
+                {c.credentialUrl && c.credentialUrl!=="#" &&
+                  <a href={formatUrl(c.credentialUrl)} target="_blank" rel="noreferrer" className="cert-link">View Credential ↗</a>
+                }
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <span className="bo-cube one" /><span className="bo-cube two" />
+    </section>
+  );
+}
 
-            {loginError && <p className="text-sm text-red-300">{loginError}</p>}
+/* ─── CONTACT ─── */
+function Contact({profile}) {
+  const [form,setForm]=useState({name:"",email:"",message:""});
+  const [status,setStatus]=useState("");
+  const [loading,setLoading]=useState(false);
+  const set=(f,v)=>setForm(p=>({...p,[f]:v}));
+  const send=async()=>{
+    if(!form.name.trim()||!form.email.trim()||!form.message.trim()){setStatus("⚠ Please fill all fields.");return;}
+    try {
+      setLoading(true); setStatus("");
+      await addDoc(collection(db,"messages"),{...form,status:"new",createdAt:serverTimestamp()});
+      setForm({name:"",email:"",message:""}); setStatus("✓ Message sent successfully!");
+    } catch { setStatus("✗ Failed to send. Try again."); } finally {
+      setLoading(false); setTimeout(()=>setStatus(""),3500);
+    }
+  };
+  const links=[
+    {label:"LinkedIn",href:formatUrl(profile.linkedin)},
+    {label:"GitHub",href:formatUrl(profile.github)},
+    {label:"Instagram",href:formatInstagramUrl(profile.instagram)},
+    {label:"Email",href:formatMailto(profile.email)},
+  ];
+  return (
+    <section id="contact" className="section contact-section">
+      <div className="section-inner">
+        <div className="section-label reveal-target">Get In Touch</div>
+        <h2 className="section-title reveal-target">Message Me</h2>
+        <p className="section-subtitle reveal-target">Open to collaborations, internships, and interesting discussions.</p>
 
-            <button
-              onClick={handleAdminLogin}
-              className="w-full rounded-2xl bg-blue-500 px-5 py-3 font-semibold hover:bg-blue-400"
-            >
-              Login
+        <div className="contact-grid">
+          <div className="contact-form-wrap reveal-target">
+            <div className="form-field">
+              <label>Name</label>
+              <input value={form.name} onChange={e=>set("name",e.target.value)} className="contact-input" placeholder="Your name" />
+            </div>
+            <div className="form-field">
+              <label>Email</label>
+              <input value={form.email} onChange={e=>set("email",e.target.value)} className="contact-input" placeholder="your@email.com" />
+            </div>
+            <div className="form-field">
+              <label>Message</label>
+              <textarea value={form.message} onChange={e=>set("message",e.target.value)} className="contact-input contact-textarea" placeholder="What's on your mind?" />
+            </div>
+            <button className="send-btn" onClick={send} disabled={loading}>
+              {loading ? <><span className="btn-spinner"/>Sending…</> : "Send Message →"}
             </button>
+            {status && <p className={`form-status ${status.startsWith("✓")?"success":"error"}`}>{status}</p>}
+          </div>
 
-            <div className="rounded-2xl bg-white/5 p-4 text-sm text-slate-400">
-              Use the admin email and password that you created in Firebase
-              Authentication.
+          <div className="contact-info-wrap reveal-target">
+            <div className="info-card">
+              <h3 className="info-card-title">Find me on</h3>
+              <div className="contact-links">
+                {links.map(l=>(
+                  <a key={l.label} href={l.href} target={l.href.startsWith("mailto")?"_self":"_blank"} rel="noreferrer" className="contact-link-btn">{l.label} ↗</a>
+                ))}
+              </div>
+            </div>
+            <div className="map-card">
+              <div className="map-pin">📍</div>
+              <p className="map-label">Based in India</p>
+              <p className="map-sub">Open to remote & hybrid work</p>
             </div>
           </div>
         </div>
       </div>
-    );
-  }
+      <span className="bo-cube one" /><span className="bo-cube two" />
+    </section>
+  );
+}
+
+/* ─── FOOTER ─── */
+function Footer() {
+  return (
+    <footer className="bo-footer">
+      <div className="footer-inner">
+        <div className="footer-brand">ANKIT<span>.DEV</span></div>
+        <p className="footer-copy">© 2026 Ankit Kumar Gupta • Built with React & Firebase</p>
+        <p className="footer-sub">Inspired by BlackOrange retro developer portfolio design</p>
+      </div>
+    </footer>
+  );
+}
+
+/* ════════════════════════════════════════
+   ADMIN PANEL (unchanged logic, new theme)
+   ════════════════════════════════════════ */
+function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messages,fetchMessages,profile,setProfile,skills,fetchSkills,onClose}) {
+  const emptyProject={title:"",description:"",tech:"",github:"",demo:"",image:""};
+  const emptyCert={title:"",provider:"",date:"",imageUrl:"",credentialUrl:""};
+
+  const [isLoggedIn,setIsLoggedIn]=useState(false);
+  const [authLoading,setAuthLoading]=useState(true);
+  const [loginData,setLoginData]=useState({email:"",password:""});
+  const [loginError,setLoginError]=useState("");
+
+  const [form,setForm]=useState(emptyProject);
+  const [editingId,setEditingId]=useState(null);
+  const [projectMsg,setProjectMsg]=useState("");
+
+  const [certForm,setCertForm]=useState(emptyCert);
+  const [editingCertId,setEditingCertId]=useState(null);
+  const [certMsg,setCertMsg]=useState("");
+
+  const [profileForm,setProfileForm]=useState(profile);
+  const [profileMsg,setProfileMsg]=useState("");
+
+  const [skillForm,setSkillForm]=useState({name:"",category:""});
+  const [editingSkillId,setEditingSkillId]=useState(null);
+  const [skillMsg,setSkillMsg]=useState("");
+
+  const [msgStatus,setMsgStatus]=useState("");
+  const [tab,setTab]=useState("profile");
+
+  const tabs=[{id:"profile",label:"Profile",icon:"👤"},{id:"skills",label:"Skills",icon:"💻"},{id:"projects",label:"Projects",icon:"💼"},{id:"certificates",label:"Certificates",icon:"🏆"},{id:"messages",label:"Messages",icon:"💬"}];
+
+  useEffect(()=>{
+    const unsub=onAuthStateChanged(auth,u=>{setIsLoggedIn(!!u);setAuthLoading(false);});
+    return unsub;
+  },[]);
+
+  const login=async()=>{
+    try{setLoginError("");await signInWithEmailAndPassword(auth,loginData.email.trim(),loginData.password.trim());}
+    catch{setLoginError("Invalid email or password.");}
+  };
+  const logout=async()=>{try{await signOut(auth);setLoginData({email:"",password:""});onClose();}catch{}};
+
+  const flash=(setter,msg)=>{setter(msg);setTimeout(()=>setter(""),2800);};
+
+  const saveProfile=async()=>{
+    try{await setDoc(doc(db,"profile","main"),{...profileForm,updatedAt:serverTimestamp()},{merge:true});setProfile(profileForm);flash(setProfileMsg,"✓ Profile saved.");}
+    catch{flash(setProfileMsg,"✗ Failed to save.");}
+  };
+
+  const saveSkill=async()=>{
+    if(!skillForm.name.trim()||!skillForm.category.trim()){flash(setSkillMsg,"Fill name and category.");return;}
+    try{
+      if(editingSkillId) await updateDoc(doc(db,"skills",editingSkillId),{...skillForm,updatedAt:serverTimestamp()});
+      else await addDoc(collection(db,"skills"),{...skillForm,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+      setSkillForm({name:"",category:""});setEditingSkillId(null);await fetchSkills();flash(setSkillMsg,"✓ Skill saved.");
+    }catch{flash(setSkillMsg,"✗ Failed.");}
+  };
+
+  const deleteSkill=async(id)=>{
+    if(!window.confirm("Delete this skill?")) return;
+    if(String(id).startsWith("d")){flash(setSkillMsg,"Cannot delete default skills.");return;}
+    try{await deleteDoc(doc(db,"skills",id));await fetchSkills();flash(setSkillMsg,"✓ Deleted.");}catch{flash(setSkillMsg,"✗ Failed.");}
+  };
+
+  const saveProject=async()=>{
+    if(!form.title.trim()||!form.description.trim()||!form.tech.trim()){flash(setProjectMsg,"Fill title, description and tech.");return;}
+    try{
+      const data={...form,github:form.github||"#",demo:form.demo||"#",image:form.image||"https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop"};
+      if(editingId) await updateDoc(doc(db,"projects",editingId),{...data,updatedAt:serverTimestamp()});
+      else await addDoc(collection(db,"projects"),{...data,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+      setForm(emptyProject);setEditingId(null);await fetchProjects();flash(setProjectMsg,"✓ Project saved.");
+    }catch{flash(setProjectMsg,"✗ Failed.");}
+  };
+  const editProject=(p)=>{if(String(p.id).startsWith("dp")){flash(setProjectMsg,"Cannot edit default.");return;}setEditingId(p.id);setForm({title:p.title||"",description:p.description||"",tech:p.tech||"",github:p.github||"",demo:p.demo||"",image:p.image||""});};
+  const deleteProject=async(id)=>{
+    if(!window.confirm("Delete?")) return;
+    if(String(id).startsWith("dp")){flash(setProjectMsg,"Cannot delete default.");return;}
+    try{await deleteDoc(doc(db,"projects",id));await fetchProjects();flash(setProjectMsg,"✓ Deleted.");}catch{flash(setProjectMsg,"✗ Failed.");}
+  };
+
+  const saveCert=async()=>{
+    if(!certForm.title.trim()){flash(setCertMsg,"Fill certificate title.");return;}
+    try{
+      if(editingCertId) await updateDoc(doc(db,"certificates",editingCertId),{...certForm,updatedAt:serverTimestamp()});
+      else await addDoc(collection(db,"certificates"),{...certForm,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+      setCertForm(emptyCert);setEditingCertId(null);await fetchCertificates();flash(setCertMsg,"✓ Saved.");
+    }catch{flash(setCertMsg,"✗ Failed.");}
+  };
+  const editCert=(c)=>{if(String(c.id).startsWith("dc")){flash(setCertMsg,"Cannot edit default.");return;}setEditingCertId(c.id);setCertForm({title:c.title||"",provider:c.provider||"",date:c.date||"",imageUrl:c.imageUrl||"",credentialUrl:c.credentialUrl||""});};
+  const deleteCert=async(id)=>{
+    if(!window.confirm("Delete?")) return;
+    if(String(id).startsWith("dc")){flash(setCertMsg,"Cannot delete default.");return;}
+    try{await deleteDoc(doc(db,"certificates",id));await fetchCertificates();flash(setCertMsg,"✓ Deleted.");}catch{flash(setCertMsg,"✗ Failed.");}
+  };
+
+  const markRead=async(id)=>{try{await updateDoc(doc(db,"messages",id),{status:"read",updatedAt:serverTimestamp()});await fetchMessages();flash(setMsgStatus,"✓ Marked as read.");}catch{flash(setMsgStatus,"✗ Failed.");}};
+  const deleteMsg=async(id)=>{if(!window.confirm("Delete message?")) return;try{await deleteDoc(doc(db,"messages",id));await fetchMessages();flash(setMsgStatus,"✓ Deleted.");}catch{flash(setMsgStatus,"✗ Failed.");}};
+  const fmtDate=(ts)=>ts?.toDate?ts.toDate().toLocaleString():"—";
+
+  if(authLoading) return <div className="admin-shell"><div className="admin-card"><p style={{color:"#324152"}}>Checking auth…</p></div></div>;
+
+  if(!isLoggedIn) return (
+    <div className="admin-shell">
+      <div className="admin-login-card">
+        <div className="admin-login-header">
+          <h2>Admin Login</h2>
+          <button className="admin-x-btn" onClick={onClose}><X /></button>
+        </div>
+        <p className="admin-hint">Login with your Firebase Authentication account.</p>
+        <div className="admin-form-group">
+          <input type="email" value={loginData.email} onChange={e=>setLoginData({...loginData,email:e.target.value})} placeholder="Admin Email" className="admin-input" />
+        </div>
+        <div className="admin-form-group">
+          <input type="password" value={loginData.password} onChange={e=>setLoginData({...loginData,password:e.target.value})} placeholder="Admin Password" className="admin-input" onKeyDown={e=>e.key==="Enter"&&login()} />
+        </div>
+        {loginError && <p className="admin-error">{loginError}</p>}
+        <button className="admin-login-btn" onClick={login}>Login →</button>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="bo-admin-shell fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
-      <div className="bo-admin-dashboard mx-auto max-w-6xl rounded-3xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
-        <div className="mb-6 flex items-center justify-between gap-4">
+    <div className="admin-shell">
+      <div className="admin-dashboard">
+        {/* header */}
+        <div className="admin-header">
           <div>
-            <h2 className="text-2xl font-bold">Admin Dashboard</h2>
-            <p className="text-sm text-slate-400">
-              Manage profile, skills, projects and certificates.
-            </p>
+            <h2 className="admin-title">Admin Dashboard</h2>
+            <p className="admin-subtitle">Manage profile, skills, projects and certificates.</p>
+            <button className="admin-logout-btn" onClick={logout}>Logout</button>
+          </div>
+          <button className="admin-x-btn" onClick={onClose}><X /></button>
+        </div>
 
-            <button
-              onClick={handleAdminLogout}
-              className="mt-3 rounded-2xl bg-red-500/20 px-4 py-2 text-sm text-red-200 hover:bg-red-500 hover:text-white"
-            >
-              Logout
+        {/* tabs */}
+        <div className="admin-tabs">
+          {tabs.map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} className={`admin-tab ${tab===t.id?"active":""}`}>
+              <span>{t.icon}</span> {t.label}
             </button>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="rounded-2xl bg-white/10 p-3 hover:bg-white hover:text-slate-950"
-          >
-            <X />
-          </button>
+          ))}
         </div>
 
-        <div className="bo-admin-tabs mb-6 rounded-3xl border border-white/10 bg-white/5 p-3">
-          <div className="grid gap-3 md:grid-cols-5">
-            {adminTabs.map((tab) => {
-              const Icon = tab.icon;
-
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveAdminTab(tab.id)}
-                  className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
-                    activeAdminTab === tab.id
-                      ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20"
-                      : "bg-slate-900 text-slate-300 hover:bg-white hover:text-slate-950"
-                  }`}
-                >
-                  <Icon size={18} />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {activeAdminTab === "profile" && (
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-            <h3 className="mb-4 flex items-center gap-2 text-xl font-bold">
-              <User size={20} /> Manage Profile
-            </h3>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <input
-                value={profileForm.name}
-                onChange={(e) => handleProfileChange("name", e.target.value)}
-                className="admin-input"
-                placeholder="Name"
-              />
-
-              <input
-                value={profileForm.title}
-                onChange={(e) => handleProfileChange("title", e.target.value)}
-                className="admin-input"
-                placeholder="Title"
-              />
-
-              <input
-                value={profileForm.headline}
-                onChange={(e) =>
-                  handleProfileChange("headline", e.target.value)
-                }
-                className="admin-input"
-                placeholder="Headline"
-              />
-
-              <input
-                value={profileForm.email}
-                onChange={(e) => handleProfileChange("email", e.target.value)}
-                className="admin-input"
-                placeholder="Email"
-              />
-
-              <input
-                value={profileForm.github}
-                onChange={(e) => handleProfileChange("github", e.target.value)}
-                className="admin-input"
-                placeholder="GitHub URL"
-              />
-
-              <input
-                value={profileForm.linkedin}
-                onChange={(e) =>
-                  handleProfileChange("linkedin", e.target.value)
-                }
-                className="admin-input"
-                placeholder="LinkedIn URL"
-              />
-
-              <input
-                value={profileForm.instagram || ""}
-                onChange={(e) =>
-                  handleProfileChange("instagram", e.target.value)
-                }
-                className="admin-input"
-                placeholder="Instagram username or URL"
-              />
-
-              <input
-                value={profileForm.resumeUrl}
-                onChange={(e) =>
-                  handleProfileChange("resumeUrl", e.target.value)
-                }
-                className="admin-input md:col-span-2"
-                placeholder="Resume URL"
-              />
+        {/* profile */}
+        {tab==="profile" && (
+          <div className="admin-panel-box">
+            <h3 className="panel-title">Manage Profile</h3>
+            <div className="admin-grid-2">
+              {[["name","Name"],["title","Title"],["headline","Headline"],["email","Email"],["github","GitHub URL"],["linkedin","LinkedIn URL"],["instagram","Instagram"],["resumeUrl","Resume URL"]].map(([k,ph])=>(
+                <input key={k} value={profileForm[k]||""} onChange={e=>setProfileForm(p=>({...p,[k]:e.target.value}))} placeholder={ph} className="admin-input" />
+              ))}
             </div>
-
-            <textarea
-              value={profileForm.about}
-              onChange={(e) => handleProfileChange("about", e.target.value)}
-              className="admin-input mt-4 h-24"
-              placeholder="About text"
-            />
-
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <textarea
-                value={profileForm.education}
-                onChange={(e) =>
-                  handleProfileChange("education", e.target.value)
-                }
-                className="admin-input h-24"
-                placeholder="Education"
-              />
-
-              <textarea
-                value={profileForm.development}
-                onChange={(e) =>
-                  handleProfileChange("development", e.target.value)
-                }
-                className="admin-input h-24"
-                placeholder="Development"
-              />
-
-              <textarea
-                value={profileForm.goal}
-                onChange={(e) => handleProfileChange("goal", e.target.value)}
-                className="admin-input h-24"
-                placeholder="Goal"
-              />
+            <textarea value={profileForm.about||""} onChange={e=>setProfileForm(p=>({...p,about:e.target.value}))} placeholder="About" className="admin-input admin-textarea" />
+            <div className="admin-grid-3">
+              {[["education","Education"],["development","Development"],["goal","Goal"]].map(([k,ph])=>(
+                <textarea key={k} value={profileForm[k]||""} onChange={e=>setProfileForm(p=>({...p,[k]:e.target.value}))} placeholder={ph} className="admin-input admin-textarea-sm" />
+              ))}
             </div>
-
-            <div className="mt-4 flex items-center gap-3">
-              <button
-                onClick={saveProfile}
-                className="inline-flex items-center gap-2 rounded-2xl bg-blue-500 px-5 py-3 font-semibold hover:bg-blue-400"
-              >
-                <Save size={18} /> Save Profile
-              </button>
-
-              {profileMessage && (
-                <p className="text-sm text-blue-200">{profileMessage}</p>
-              )}
+            <div className="panel-footer">
+              <button className="panel-save-btn" onClick={saveProfile}><Save /> Save Profile</button>
+              {profileMsg && <span className="panel-msg">{profileMsg}</span>}
             </div>
           </div>
         )}
 
-        {activeAdminTab === "skills" && (
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-            <h3 className="mb-4 flex items-center gap-2 text-xl font-bold">
-              <Code2 size={20} /> Manage Skills
-            </h3>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <input
-                value={skillForm.name}
-                onChange={(e) =>
-                  setSkillForm({ ...skillForm, name: e.target.value })
-                }
-                className="admin-input"
-                placeholder="Skill name, e.g. React JS"
-              />
-
-              <input
-                value={skillForm.category}
-                onChange={(e) =>
-                  setSkillForm({ ...skillForm, category: e.target.value })
-                }
-                className="admin-input"
-                placeholder="Category, e.g. Frontend"
-              />
+        {/* skills */}
+        {tab==="skills" && (
+          <div className="admin-panel-box">
+            <h3 className="panel-title">Manage Skills</h3>
+            <div className="admin-grid-2">
+              <input value={skillForm.name} onChange={e=>setSkillForm(p=>({...p,name:e.target.value}))} placeholder="Skill name, e.g. React JS" className="admin-input" />
+              <input value={skillForm.category} onChange={e=>setSkillForm(p=>({...p,category:e.target.value}))} placeholder="Category, e.g. Frontend" className="admin-input" />
             </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                onClick={saveSkill}
-                className="inline-flex items-center gap-2 rounded-2xl bg-blue-500 px-5 py-3 font-semibold hover:bg-blue-400"
-              >
-                <Save size={18} />{" "}
-                {editingSkillId ? "Update Skill" : "Add Skill"}
-              </button>
-
-              {editingSkillId && (
-                <button
-                  onClick={() => {
-                    setEditingSkillId(null);
-                    setSkillForm({ name: "", category: "" });
-                  }}
-                  className="rounded-2xl bg-white/10 px-5 py-3 hover:bg-white hover:text-slate-950"
-                >
-                  Cancel
-                </button>
-              )}
-
-              {skillMessage && (
-                <p className="text-sm text-blue-200">{skillMessage}</p>
-              )}
+            <div className="panel-footer">
+              <button className="panel-save-btn" onClick={saveSkill}><Save /> {editingSkillId?"Update":"Add"} Skill</button>
+              {editingSkillId && <button className="panel-cancel-btn" onClick={()=>{setEditingSkillId(null);setSkillForm({name:"",category:""});}}>Cancel</button>}
+              {skillMsg && <span className="panel-msg">{skillMsg}</span>}
             </div>
-
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              {skills.map((skill) => (
-                <div key={skill.id} className="rounded-2xl bg-slate-900 p-4">
-                  <h4 className="font-bold">{skill.name}</h4>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {skill.category}
-                  </p>
-
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      onClick={() => editSkill(skill)}
-                      className="rounded-xl bg-white/10 px-3 py-2 text-sm hover:bg-white hover:text-slate-950"
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      onClick={() => deleteSkill(skill.id)}
-                      className="rounded-xl bg-red-500/20 px-3 py-2 text-sm text-red-200 hover:bg-red-500 hover:text-white"
-                    >
-                      Delete
-                    </button>
+            <div className="admin-items-grid">
+              {skills.map(s=>(
+                <div key={s.id} className="admin-item-card">
+                  <div className="item-name">{s.name}</div>
+                  <div className="item-sub">{s.category}</div>
+                  <div className="item-actions">
+                    <button className="item-edit" onClick={()=>{setEditingSkillId(s.id);setSkillForm({name:s.name,category:s.category});}}>Edit</button>
+                    <button className="item-delete" onClick={()=>deleteSkill(s.id)}>Delete</button>
                   </div>
                 </div>
               ))}
@@ -1921,390 +824,109 @@ function AdminPanel({
           </div>
         )}
 
-        {activeAdminTab === "projects" && (
+        {/* projects */}
+        {tab==="projects" && (
           <>
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-              <h3 className="mb-4 flex items-center gap-2 text-xl font-bold">
-                <Plus size={20} /> {editingId ? "Edit Project" : "Add Project"}
-              </h3>
-
-              <div className="space-y-3">
-                <input
-                  value={form.title}
-                  onChange={(e) => handleChange("title", e.target.value)}
-                  className="admin-input"
-                  placeholder="Project title"
-                />
-
-                <textarea
-                  value={form.description}
-                  onChange={(e) => handleChange("description", e.target.value)}
-                  className="admin-input h-24"
-                  placeholder="Project description"
-                />
-
-                <input
-                  value={form.tech}
-                  onChange={(e) => handleChange("tech", e.target.value)}
-                  className="admin-input"
-                  placeholder="Technology used"
-                />
-
-                <input
-                  value={form.github}
-                  onChange={(e) => handleChange("github", e.target.value)}
-                  className="admin-input"
-                  placeholder="GitHub link"
-                />
-
-                <input
-                  value={form.demo}
-                  onChange={(e) => handleChange("demo", e.target.value)}
-                  className="admin-input"
-                  placeholder="Live demo link"
-                />
-
-                <input
-                  value={form.image}
-                  onChange={(e) => handleChange("image", e.target.value)}
-                  className="admin-input"
-                  placeholder="Image URL"
-                />
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button
-                  onClick={saveProject}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-blue-500 px-5 py-3 font-semibold hover:bg-blue-400"
-                >
-                  <Save size={18} />{" "}
-                  {editingId ? "Update Project" : "Save Project"}
-                </button>
-
-                {editingId && (
-                  <button
-                    onClick={() => {
-                      setEditingId(null);
-                      setForm(emptyProject);
-                    }}
-                    className="rounded-2xl bg-white/10 px-5 py-3 hover:bg-white hover:text-slate-950"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-
-              {projectMessage && (
-                <p className="mt-3 text-sm text-blue-200">{projectMessage}</p>
-              )}
+          <div className="admin-panel-box">
+            <h3 className="panel-title">{editingId?"Edit":"Add"} Project</h3>
+            <div className="admin-form-stack">
+              {[["title","Project title"],["tech","Technology used"],["github","GitHub link"],["demo","Live demo link"],["image","Image URL"]].map(([k,ph])=>(
+                <input key={k} value={form[k]} onChange={e=>setForm(p=>({...p,[k]:e.target.value}))} placeholder={ph} className="admin-input" />
+              ))}
+              <textarea value={form.description} onChange={e=>setForm(p=>({...p,description:e.target.value}))} placeholder="Project description" className="admin-input admin-textarea" />
             </div>
-
-            <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
-              <h3 className="mb-4 text-xl font-bold">All Projects</h3>
-
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {projects.map((project) => (
-                  <div key={project.id} className="rounded-2xl bg-slate-900 p-4">
-                    <h4 className="font-bold">{project.title}</h4>
-
-                    <p className="mt-2 line-clamp-2 text-sm text-slate-400">
-                      {project.description}
-                    </p>
-
-                    <p className="mt-2 text-sm text-blue-200">{project.tech}</p>
-
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        onClick={() => editProject(project)}
-                        className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-sm hover:bg-white hover:text-slate-950"
-                      >
-                        <Pencil size={15} /> Edit
-                      </button>
-
-                      <button
-                        onClick={() => deleteProject(project.id)}
-                        className="inline-flex items-center gap-2 rounded-xl bg-red-500/20 px-3 py-2 text-sm text-red-200 hover:bg-red-500 hover:text-white"
-                      >
-                        <Trash2 size={15} /> Delete
-                      </button>
-                    </div>
+            <div className="panel-footer">
+              <button className="panel-save-btn" onClick={saveProject}><Save /> {editingId?"Update":"Save"} Project</button>
+              {editingId && <button className="panel-cancel-btn" onClick={()=>{setEditingId(null);setForm(emptyProject);}}>Cancel</button>}
+              {projectMsg && <span className="panel-msg">{projectMsg}</span>}
+            </div>
+          </div>
+          <div className="admin-panel-box" style={{marginTop:"20px"}}>
+            <h3 className="panel-title">All Projects</h3>
+            <div className="admin-items-grid">
+              {projects.map(p=>(
+                <div key={p.id} className="admin-item-card">
+                  <div className="item-name">{p.title}</div>
+                  <div className="item-sub">{p.tech}</div>
+                  <div className="item-actions">
+                    <button className="item-edit" onClick={()=>editProject(p)}><Pencil /> Edit</button>
+                    <button className="item-delete" onClick={()=>deleteProject(p.id)}><Trash2 /> Delete</button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
+          </div>
           </>
         )}
 
-        {activeAdminTab === "certificates" && (
+        {/* certificates */}
+        {tab==="certificates" && (
           <>
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-              <h3 className="mb-4 flex items-center gap-2 text-xl font-bold">
-                <Award size={20} />{" "}
-                {editingCertificateId ? "Edit Certificate" : "Add Certificate"}
-              </h3>
-
-              <div className="space-y-3">
-                <input
-                  value={certificateForm.title}
-                  onChange={(e) =>
-                    handleCertificateChange("title", e.target.value)
-                  }
-                  className="admin-input"
-                  placeholder="Certificate title"
-                />
-
-                <input
-                  value={certificateForm.provider}
-                  onChange={(e) =>
-                    handleCertificateChange("provider", e.target.value)
-                  }
-                  className="admin-input"
-                  placeholder="Provider / Organization"
-                />
-
-                <input
-                  value={certificateForm.date}
-                  onChange={(e) =>
-                    handleCertificateChange("date", e.target.value)
-                  }
-                  className="admin-input"
-                  placeholder="Date, e.g. 2026"
-                />
-
-                <input
-                  value={certificateForm.imageUrl}
-                  onChange={(e) =>
-                    handleCertificateChange("imageUrl", e.target.value)
-                  }
-                  className="admin-input"
-                  placeholder="Certificate image URL or Google Drive share link"
-                />
-
-                <input
-                  value={certificateForm.credentialUrl}
-                  onChange={(e) =>
-                    handleCertificateChange("credentialUrl", e.target.value)
-                  }
-                  className="admin-input"
-                  placeholder="Credential URL"
-                />
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button
-                  onClick={saveCertificate}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-blue-500 px-5 py-3 font-semibold hover:bg-blue-400"
-                >
-                  <Save size={18} />{" "}
-                  {editingCertificateId
-                    ? "Update Certificate"
-                    : "Save Certificate"}
-                </button>
-
-                {editingCertificateId && (
-                  <button
-                    onClick={() => {
-                      setEditingCertificateId(null);
-                      setCertificateForm(emptyCertificate);
-                    }}
-                    className="rounded-2xl bg-white/10 px-5 py-3 hover:bg-white hover:text-slate-950"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-
-              {certificateMessage && (
-                <p className="mt-3 text-sm text-blue-200">
-                  {certificateMessage}
-                </p>
-              )}
+          <div className="admin-panel-box">
+            <h3 className="panel-title">{editingCertId?"Edit":"Add"} Certificate</h3>
+            <div className="admin-form-stack">
+              {[["title","Certificate title"],["provider","Provider / Organization"],["date","Date, e.g. 2026"],["imageUrl","Image URL or Google Drive link"],["credentialUrl","Credential URL"]].map(([k,ph])=>(
+                <input key={k} value={certForm[k]} onChange={e=>setCertForm(p=>({...p,[k]:e.target.value}))} placeholder={ph} className="admin-input" />
+              ))}
             </div>
-
-            <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
-              <h3 className="mb-4 text-xl font-bold">All Certificates</h3>
-
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {certificates.map((cert) => (
-                  <div key={cert.id} className="rounded-2xl bg-slate-900 p-4">
-                    <h4 className="font-bold">{cert.title}</h4>
-                    <p className="mt-1 text-sm text-slate-400">{cert.provider}</p>
-                    <p className="mt-1 text-sm text-blue-200">{cert.date}</p>
-
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        onClick={() => editCertificate(cert)}
-                        className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-sm hover:bg-white hover:text-slate-950"
-                      >
-                        <Pencil size={15} /> Edit
-                      </button>
-
-                      <button
-                        onClick={() => deleteCertificate(cert.id)}
-                        className="inline-flex items-center gap-2 rounded-xl bg-red-500/20 px-3 py-2 text-sm text-red-200 hover:bg-red-500 hover:text-white"
-                      >
-                        <Trash2 size={15} /> Delete
-                      </button>
-                    </div>
+            <div className="panel-footer">
+              <button className="panel-save-btn" onClick={saveCert}><Save /> {editingCertId?"Update":"Save"} Certificate</button>
+              {editingCertId && <button className="panel-cancel-btn" onClick={()=>{setEditingCertId(null);setCertForm(emptyCert);}}>Cancel</button>}
+              {certMsg && <span className="panel-msg">{certMsg}</span>}
+            </div>
+          </div>
+          <div className="admin-panel-box" style={{marginTop:"20px"}}>
+            <h3 className="panel-title">All Certificates</h3>
+            <div className="admin-items-grid">
+              {certificates.map(c=>(
+                <div key={c.id} className="admin-item-card">
+                  <div className="item-name">{c.title}</div>
+                  <div className="item-sub">{c.provider} • {c.date}</div>
+                  <div className="item-actions">
+                    <button className="item-edit" onClick={()=>editCert(c)}><Pencil /> Edit</button>
+                    <button className="item-delete" onClick={()=>deleteCert(c.id)}><Trash2 /> Delete</button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
+          </div>
           </>
         )}
 
-        {activeAdminTab === "messages" && (
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold">Contact Messages</h3>
-                <p className="text-sm text-slate-400">
-                  Messages submitted from the public contact form.
-                </p>
-              </div>
-
-              <button
-                onClick={fetchMessages}
-                className="rounded-2xl bg-white/10 px-4 py-2 text-sm hover:bg-white hover:text-slate-950"
-              >
-                Refresh
-              </button>
+        {/* messages */}
+        {tab==="messages" && (
+          <div className="admin-panel-box">
+            <div className="panel-footer" style={{marginBottom:"16px"}}>
+              <h3 className="panel-title" style={{margin:0}}>Contact Messages</h3>
+              <button className="panel-cancel-btn" onClick={fetchMessages}>Refresh</button>
+              {msgStatus && <span className="panel-msg">{msgStatus}</span>}
             </div>
-
-            {messageAdminStatus && (
-              <p className="mb-4 text-sm text-blue-200">{messageAdminStatus}</p>
-            )}
-
-            {messages.length === 0 ? (
-              <div className="rounded-2xl bg-slate-900 p-5 text-sm text-slate-400">
-                No messages yet.
-              </div>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className="rounded-2xl border border-white/10 bg-slate-900 p-4"
-                  >
-                    <div className="mb-3 flex items-start justify-between gap-3">
-                      <div>
-                        <h4 className="font-bold">{msg.name}</h4>
-                        <a
-                          href={formatMailto(msg.email)}
-                          className="text-sm text-blue-200 hover:underline"
-                        >
-                          {msg.email}
-                        </a>
+            {messages.length===0
+              ? <p style={{color:"#324152",padding:"20px"}}>No messages yet.</p>
+              : <div className="msg-grid">
+                  {messages.map(m=>(
+                    <div key={m.id} className="msg-card">
+                      <div className="msg-header">
+                        <div>
+                          <div className="msg-name">{m.name}</div>
+                          <a href={formatMailto(m.email)} className="msg-email">{m.email}</a>
+                        </div>
+                        <span className={`msg-badge ${m.status==="read"?"read":"new"}`}>{m.status||"new"}</span>
                       </div>
-
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs ${
-                          msg.status === "read"
-                            ? "bg-green-500/20 text-green-200"
-                            : "bg-blue-500/20 text-blue-200"
-                        }`}
-                      >
-                        {msg.status || "new"}
-                      </span>
+                      <p className="msg-text"><LinkifiedText text={m.message} /></p>
+                      <p className="msg-date">{fmtDate(m.createdAt)}</p>
+                      <div className="item-actions">
+                        <button className="item-edit" onClick={()=>markRead(m.id)}>Mark Read</button>
+                        <a href={formatMailto(m.email)} className="item-edit" style={{textDecoration:"none",display:"inline-flex",alignItems:"center"}}>Reply</a>
+                        <button className="item-delete" onClick={()=>deleteMsg(m.id)}>Delete</button>
+                      </div>
                     </div>
-
-                    <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300">
-                      <LinkifiedText text={msg.message} />
-                    </p>
-
-                    <p className="mt-3 text-xs text-slate-500">
-                      {formatMessageDate(msg.createdAt)}
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        onClick={() => markMessageAsRead(msg.id)}
-                        className="rounded-xl bg-white/10 px-3 py-2 text-sm hover:bg-white hover:text-slate-950"
-                      >
-                        Mark as Read
-                      </button>
-
-                      <a
-                        href={formatMailto(msg.email)}
-                        className="rounded-xl bg-blue-500 px-3 py-2 text-sm hover:bg-blue-400"
-                      >
-                        Reply
-                      </a>
-
-                      <button
-                        onClick={() => deleteMessage(msg.id)}
-                        className="rounded-xl bg-red-500/20 px-3 py-2 text-sm text-red-200 hover:bg-red-500 hover:text-white"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+            }
           </div>
         )}
-
       </div>
-
-      <style>{`
-        .admin-input {
-          width: 100%;
-          border-radius: 1rem;
-          border: 1px solid rgba(255,255,255,0.1);
-          background: rgb(15 23 42);
-          padding: 0.8rem 1rem;
-          color: white;
-          outline: none;
-        }
-
-        .admin-input:focus {
-          border-color: rgb(96 165 250);
-        }
-
-        .space-y-3 > * + * {
-          margin-top: 12px;
-        }
-
-        .space-y-4 > * + * {
-          margin-top: 16px;
-        }
-
-        .place-items-center {
-          place-items: center;
-        }
-
-        .max-w-md {
-          max-width: 430px;
-        }
-
-        .lg\\:col-span-2 {
-          grid-column: span 2 / span 2;
-        }
-
-        .md\\:col-span-2 {
-          grid-column: span 2 / span 2;
-        }
-
-        @media (max-width: 900px) {
-          .lg\\:col-span-2,
-          .md\\:col-span-2 {
-            grid-column: span 1 / span 1;
-          }
-        }
-      `}</style>
     </div>
   );
 }
-
-function Footer() {
-  return (
-    <footer className="bo-footer">
-      <p>© 2026 Ankit Portfolio. Built with React and Firebase.</p>
-      <p className="bo-footer-subtitle">
-        Inspired by a BlackOrange retro developer portfolio design.
-      </p>
-    </footer>
-  );
-}
-
