@@ -60,6 +60,20 @@ function formatMailto(email) {
   return cleanEmail ? `mailto:${cleanEmail}` : "#";
 }
 
+function formatInstagramUrl(value) {
+  const cleanValue = (value || "").trim();
+
+  if (!cleanValue || cleanValue === "#") {
+    return "#";
+  }
+
+  if (/^https?:\/\//i.test(cleanValue) || /^www\./i.test(cleanValue)) {
+    return formatUrl(cleanValue);
+  }
+
+  return `https://www.instagram.com/${cleanValue.replace(/^@/, "")}`;
+}
+
 function LinkifiedText({ text }) {
   const value = String(text || "");
   const pattern =
@@ -126,6 +140,72 @@ function useScrollReveal() {
   }, []);
 }
 
+function useCubeReaction() {
+  useEffect(() => {
+    let frameId = 0;
+
+    const resetCube = (cube) => {
+      cube.style.setProperty("--cube-hit-x", "0px");
+      cube.style.setProperty("--cube-hit-y", "0px");
+      cube.style.setProperty("--cube-hit-rotate", "0deg");
+      cube.style.setProperty("--cube-hit-scale", "1");
+      cube.classList.remove("is-hit");
+    };
+
+    const reactToPointer = (event) => {
+      window.cancelAnimationFrame(frameId);
+
+      frameId = window.requestAnimationFrame(() => {
+        const cubes = document.querySelectorAll(".bo-cube");
+        const isSmallScreen = window.innerWidth <= 700;
+        const threshold = isSmallScreen ? 86 : 130;
+        const maxPush = isSmallScreen ? 34 : 58;
+
+        cubes.forEach((cube) => {
+          const rect = cube.getBoundingClientRect();
+          const cubeX = rect.left + rect.width / 2;
+          const cubeY = rect.top + rect.height / 2;
+          const dx = cubeX - event.clientX;
+          const dy = cubeY - event.clientY;
+          const distance = Math.hypot(dx, dy);
+
+          if (distance > threshold) {
+            resetCube(cube);
+            return;
+          }
+
+          const safeDistance = Math.max(distance, 1);
+          const force = (1 - safeDistance / threshold) * maxPush;
+          const pushX = (dx / safeDistance) * force;
+          const pushY = (dy / safeDistance) * force;
+          const rotate = Math.max(-22, Math.min(22, (pushX - pushY) * 0.5));
+
+          cube.style.setProperty("--cube-hit-x", `${pushX.toFixed(2)}px`);
+          cube.style.setProperty("--cube-hit-y", `${pushY.toFixed(2)}px`);
+          cube.style.setProperty("--cube-hit-rotate", `${rotate.toFixed(2)}deg`);
+          cube.style.setProperty("--cube-hit-scale", "1.08");
+          cube.classList.add("is-hit");
+        });
+      });
+    };
+
+    const resetAllCubes = () => {
+      document.querySelectorAll(".bo-cube").forEach(resetCube);
+    };
+
+    window.addEventListener("pointermove", reactToPointer);
+    window.addEventListener("pointerleave", resetAllCubes);
+    window.addEventListener("blur", resetAllCubes);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("pointermove", reactToPointer);
+      window.removeEventListener("pointerleave", resetAllCubes);
+      window.removeEventListener("blur", resetAllCubes);
+    };
+  }, []);
+}
+
 const defaultProfile = {
   name: "Ankit",
   title: "MCA Student • Java Developer • Web Developer",
@@ -142,6 +222,7 @@ const defaultProfile = {
   github: "https://github.com/cskfan07",
   linkedin:
     "https://www.linkedin.com/in/ankit-gupta2201?utm_source=share_via&utm_content=profile&utm_medium=member_android",
+  instagram: "mky_2201",
   resumeUrl: "#",
 };
 
@@ -426,6 +507,7 @@ function PortfolioPage() {
   const navigate = useNavigate();
 
   useScrollReveal();
+  useCubeReaction();
   const { profile, profileLoading } = useProfile();
   const { skills, skillsLoading } = useSkills();
   const { projects, projectsLoading } = useProjects();
@@ -993,6 +1075,14 @@ function Contact({ profile }) {
                     rel="noreferrer"
                   >
                     GitHub
+                  </a>
+                  <a
+                    className="bo-contact-button"
+                    href={formatInstagramUrl(profile.instagram)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Instagram
                   </a>
                   <a
                     className="bo-contact-button"
@@ -1644,6 +1734,15 @@ function AdminPanel({
                 }
                 className="admin-input"
                 placeholder="LinkedIn URL"
+              />
+
+              <input
+                value={profileForm.instagram || ""}
+                onChange={(e) =>
+                  handleProfileChange("instagram", e.target.value)
+                }
+                className="admin-input"
+                placeholder="Instagram username or URL"
               />
 
               <input

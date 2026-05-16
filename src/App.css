@@ -2597,3 +2597,162 @@ body,
     letter-spacing: 0 !important;
   }
 }
+
+/* ===== Moving cube blocks with cursor reaction ===== */
+.bo-cube {
+  --cube-hit-x: 0px;
+  --cube-hit-y: 0px;
+  --cube-hit-rotate: 0deg;
+  --cube-hit-scale: 1;
+  width: clamp(38px, 4vw, 58px) !important;
+  height: clamp(38px, 4vw, 58px) !important;
+  border-radius: 10px !important;
+  cursor: crosshair;
+  pointer-events: auto;
+  will-change: transform;
+  transition:
+    filter 0.18s ease,
+    box-shadow 0.18s ease;
+  animation: boCubeWander 8s ease-in-out infinite alternate;
+  transform:
+    translate3d(var(--cube-hit-x), var(--cube-hit-y), 0)
+    rotate(calc(20deg + var(--cube-hit-rotate)))
+    scale(var(--cube-hit-scale));
+}
+
+.bo-cube.one {
+  animation-duration: 9s;
+  animation-delay: -1.2s;
+}
+
+.bo-cube.two {
+  width: clamp(42px, 4.6vw, 66px) !important;
+  height: clamp(42px, 4.6vw, 66px) !important;
+  animation-name: boCubeWanderTwo;
+  animation-duration: 10.5s;
+  animation-delay: -3s;
+}
+
+.bo-cube.three {
+  width: clamp(32px, 3.2vw, 48px) !important;
+  height: clamp(32px, 3.2vw, 48px) !important;
+  animation-name: boCubeWanderThree;
+  animation-duration: 7.5s;
+  animation-delay: -2s;
+}
+
+.bo-cube.is-hit {
+  filter: brightness(1.16) saturate(1.12);
+  box-shadow: 0 20px 34px rgba(10, 24, 37, 0.32) !important;
+}
+
+@keyframes boCubeWander {
+  0% {
+    transform:
+      translate3d(calc(var(--cube-hit-x) - 14px), calc(var(--cube-hit-y) + 8px), 0)
+      rotate(calc(10deg + var(--cube-hit-rotate)))
+      scale(var(--cube-hit-scale));
+  }
+
+  50% {
+    transform:
+      translate3d(calc(var(--cube-hit-x) + 38px), calc(var(--cube-hit-y) - 22px), 0)
+      rotate(calc(58deg + var(--cube-hit-rotate)))
+      scale(var(--cube-hit-scale));
+  }
+
+  100% {
+    transform:
+      translate3d(calc(var(--cube-hit-x) - 4px), calc(var(--cube-hit-y) + 34px), 0)
+      rotate(calc(25deg + var(--cube-hit-rotate)))
+      scale(var(--cube-hit-scale));
+  }
+}
+
+@keyframes boCubeWanderTwo {
+  0% {
+    transform:
+      translate3d(calc(var(--cube-hit-x) + 8px), calc(var(--cube-hit-y) - 18px), 0)
+      rotate(calc(-14deg + var(--cube-hit-rotate)))
+      scale(var(--cube-hit-scale));
+  }
+
+  50% {
+    transform:
+      translate3d(calc(var(--cube-hit-x) - 42px), calc(var(--cube-hit-y) + 16px), 0)
+      rotate(calc(36deg + var(--cube-hit-rotate)))
+      scale(var(--cube-hit-scale));
+  }
+
+  100% {
+    transform:
+      translate3d(calc(var(--cube-hit-x) + 18px), calc(var(--cube-hit-y) + 34px), 0)
+      rotate(calc(66deg + var(--cube-hit-rotate)))
+      scale(var(--cube-hit-scale));
+  }
+}
+
+@keyframes boCubeWanderThree {
+  0% {
+    transform:
+      translate3d(calc(var(--cube-hit-x) - 10px), calc(var(--cube-hit-y) - 10px), 0)
+      rotate(calc(18deg + var(--cube-hit-rotate)))
+      scale(var(--cube-hit-scale));
+  }
+
+  50% {
+    transform:
+      translate3d(calc(var(--cube-hit-x) + 26px), calc(var(--cube-hit-y) + 42px), 0)
+      rotate(calc(80deg + var(--cube-hit-rotate)))
+      scale(var(--cube-hit-scale));
+  }
+
+  100% {
+    transform:
+      translate3d(calc(var(--cube-hit-x) - 30px), calc(var(--cube-hit-y) + 6px), 0)
+      rotate(calc(32deg + var(--cube-hit-rotate)))
+      scale(var(--cube-hit-scale));
+  }
+}
+
+@media (max-width: 700px) {
+  .bo-cube {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 7px !important;
+    animation-duration: 7s;
+  }
+
+  .bo-cube.two {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .bo-cube.three {
+    width: 26px !important;
+    height: 26px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .bo-cube {
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  .bo-cube.two {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .bo-cube.three {
+    width: 22px !important;
+    height: 22px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bo-cube {
+    animation: none !important;
+  }
+}
