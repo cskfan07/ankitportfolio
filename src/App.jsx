@@ -52,10 +52,13 @@ function getGoogleDriveFileId(url) {
   for (const p of pats) { const m = c.match(p); if (m?.[1]) return m[1]; }
   return "";
 }
-function formatCertificateImageUrl(url) {
+const DEFAULT_PROJECT_IMAGE = "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop";
+
+function formatImageUrl(url) {
   const id = getGoogleDriveFileId(url);
   return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1200` : formatUrl(url);
 }
+const formatCertificateImageUrl = formatImageUrl;
 function formatMailto(e) { const c = (e||"").trim(); return c ? `mailto:${c}` : "#"; }
 function formatInstagramUrl(v) {
   const c = (v||"").trim();
@@ -459,7 +462,13 @@ function Projects({projects,search,setSearch}) {
               {projects.map((p,i)=>(
                 <article key={p.id} className="project-card reveal-target" style={{"--delay":`${i*120}ms`}}>
                   <div className="project-img-wrap">
-                    <img src={p.image||"https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop"} alt={p.title} className="project-img" />
+                    <img
+                      src={p.image ? formatImageUrl(p.image) : DEFAULT_PROJECT_IMAGE}
+                      alt={p.title}
+                      className="project-img"
+                      referrerPolicy="no-referrer"
+                      onError={(e)=>{ if (e.currentTarget.src !== DEFAULT_PROJECT_IMAGE) e.currentTarget.src = DEFAULT_PROJECT_IMAGE; }}
+                    />
                     <div className="project-img-overlay">
                       <a href={formatUrl(p.github)} target="_blank" rel="noreferrer" className="overlay-btn">Code ⌘</a>
                       <a href={formatUrl(p.demo)} target="_blank" rel="noreferrer" className="overlay-btn accent">Live ↗</a>
@@ -698,7 +707,7 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messa
   const saveProject=async()=>{
     if(!form.title.trim()||!form.description.trim()||!form.tech.trim()){flash(setProjectMsg,"Fill title, description and tech.");return;}
     try{
-      const data={...form,github:form.github||"#",demo:form.demo||"#",image:form.image||"https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop"};
+      const data={...form,github:form.github||"#",demo:form.demo||"#",image:form.image||DEFAULT_PROJECT_IMAGE};
       if(editingId) await updateDoc(doc(db,"projects",editingId),{...data,updatedAt:serverTimestamp()});
       else await addDoc(collection(db,"projects"),{...data,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
       setForm(emptyProject);setEditingId(null);await fetchProjects();flash(setProjectMsg,"✓ Project saved.");
