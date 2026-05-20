@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 
@@ -19,9 +19,12 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   query,
   orderBy,
 } from "firebase/firestore";
+
+/* eslint-disable no-unused-vars */
 
 /* ─── Icon stubs ─── */
 const User = (props) => <span {...props}>👤</span>;
@@ -36,6 +39,7 @@ const Trash2 = (props) => <span {...props}>🗑</span>;
 const Pencil = (props) => <span {...props}>✎</span>;
 
 /* ─── Helpers ─── */
+/* eslint-enable no-unused-vars */
 function formatUrl(url) {
   if (!url || url.trim() === "" || url === "#") return "#";
   const c = url.trim();
@@ -60,6 +64,9 @@ function formatImageUrl(url) {
 }
 const formatCertificateImageUrl = formatImageUrl;
 function formatMailto(e) { const c = (e||"").trim(); return c ? `mailto:${c}` : "#"; }
+function isValidEmail(e) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test((e || "").trim());
+}
 function formatInstagramUrl(v) {
   const c = (v||"").trim();
   if (!c || c==="#") return "#";
@@ -176,15 +183,62 @@ const defaultSkills = [
   {id:"d11",name:"GitHub",category:"Tools"},{id:"d12",name:"Power BI",category:"Analytics"},
 ];
 const defaultProjects = [
-  {id:"dp1",title:"MCA Alumni Connect",description:"A role-based alumni portal with student, alumni and admin dashboards, notifications and job post management.",tech:"Django, MongoDB Atlas, HTML, CSS, JavaScript",github:"#",demo:"https://mca-alumni-connect.onrender.com",image:"https://images.unsplash.com/photo-1551434678-e076c223a692?q=80&w=1200&auto=format&fit=crop"},
-  {id:"dp2",title:"Smart E-Driving Licence System",description:"A web system for learning licence, DL application, document verification, slot booking, exam and QR-based licence validation.",tech:"Java Servlet, JSP, MySQL, Tomcat",github:"#",demo:"#",image:"https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=1200&auto=format&fit=crop"},
-  {id:"dp3",title:"Gud-Madhur AI",description:"A jaggery e-commerce platform with product listing, cart, orders, payments and an AI FAQ chatbot.",tech:"Servlet, JSP, MySQL, JavaScript",github:"#",demo:"#",image:"https://images.unsplash.com/photo-1606787366850-de6330128bfc?q=80&w=1200&auto=format&fit=crop"},
+  {id:"dp1",title:"MCA Alumni Connect",description:"A role-based alumni portal with student, alumni and admin dashboards, notifications and job post management.",experience:"Built a practical full-stack dashboard flow with authentication, data management and deployment practice.",tech:"Django, MongoDB Atlas, HTML, CSS, JavaScript",github:"#",demo:"https://mca-alumni-connect.onrender.com",image:"https://images.unsplash.com/photo-1551434678-e076c223a692?q=80&w=1200&auto=format&fit=crop"},
+  {id:"dp2",title:"Smart E-Driving Licence System",description:"A web system for learning licence, DL application, document verification, slot booking, exam and QR-based licence validation.",experience:"Practiced Java web development, form handling, database operations and role-based workflows.",tech:"Java Servlet, JSP, MySQL, Tomcat",github:"#",demo:"#",image:"https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=1200&auto=format&fit=crop"},
+  {id:"dp3",title:"Gud-Madhur AI",description:"A jaggery e-commerce platform with product listing, cart, orders, payments and an AI FAQ chatbot.",experience:"Improved e-commerce logic, UI flow, cart handling and chatbot integration experience.",tech:"Servlet, JSP, MySQL, JavaScript",github:"#",demo:"#",image:"https://images.unsplash.com/photo-1606787366850-de6330128bfc?q=80&w=1200&auto=format&fit=crop"},
 ];
 const defaultCertificates = [
-  {id:"dc1",title:"Generative AI 101",provider:"Learning Program",date:"2026",imageUrl:"",credentialUrl:"#"},
-  {id:"dc2",title:"Digital Edge Program",provider:"Learning Program",date:"2026",imageUrl:"",credentialUrl:"#"},
-  {id:"dc3",title:"Java Development Practice",provider:"Practice Certificate",date:"2026",imageUrl:"",credentialUrl:"#"},
-  {id:"dc4",title:"Power BI Basics",provider:"Learning Program",date:"2026",imageUrl:"",credentialUrl:"#"},
+  {id:"dc1",title:"Generative AI 101",provider:"Learning Program",date:"2026",experience:"Learned AI fundamentals, prompt basics and practical ways to use generative tools.",imageUrl:"",credentialUrl:"#"},
+  {id:"dc2",title:"Digital Edge Program",provider:"Learning Program",date:"2026",experience:"Gained exposure to digital skills, workplace readiness and modern technology concepts.",imageUrl:"",credentialUrl:"#"},
+  {id:"dc3",title:"Java Development Practice",provider:"Practice Certificate",date:"2026",experience:"Strengthened Java programming, backend logic and object-oriented development concepts.",imageUrl:"",credentialUrl:"#"},
+  {id:"dc4",title:"Power BI Basics",provider:"Learning Program",date:"2026",experience:"Practiced dashboard creation, data visualization and basic analytics reporting.",imageUrl:"",credentialUrl:"#"},
+];
+const defaultResources = [
+  {
+    id:"dr1",
+    title:"AI/ML Notes",
+    tag:"Intelligence",
+    summary:"Core concepts from machine learning, generative AI, model evaluation and practical prompt workflows.",
+    topics:["ML basics","Neural networks","Prompting","Model metrics"],
+    accent:"#4a9aa5",
+    href:"#",
+  },
+  {
+    id:"dr2",
+    title:"Java Notes",
+    tag:"Backend",
+    summary:"Object-oriented programming, collections, JDBC, Servlets, JSP and backend project patterns.",
+    topics:["OOP","Collections","JDBC","Servlet/JSP"],
+    accent:"#b7791f",
+    href:"#",
+  },
+  {
+    id:"dr3",
+    title:"Power BI Notes",
+    tag:"Analytics",
+    summary:"Dashboard building, data cleaning, relationships, DAX basics and visual storytelling.",
+    topics:["DAX","Reports","Charts","Data model"],
+    accent:"#d4962d",
+    href:"#",
+  },
+  {
+    id:"dr4",
+    title:"STQA Notes",
+    tag:"Testing",
+    summary:"Software testing fundamentals, test case design, quality assurance and defect tracking.",
+    topics:["Test cases","SDLC","QA process","Bug reports"],
+    accent:"#3d6b31",
+    href:"#",
+  },
+  {
+    id:"dr5",
+    title:"Web Dev Notes",
+    tag:"Frontend",
+    summary:"HTML, CSS, JavaScript, React and responsive UI patterns used in real projects.",
+    topics:["HTML/CSS","JavaScript","React","Responsive UI"],
+    accent:"#31596b",
+    href:"#",
+  },
 ];
 
 /* ─── Data hooks ─── */
@@ -208,9 +262,21 @@ function useCollection(col,defaults) {
   const fetch=async()=>{
     try {
       const snap=await getDocs(query(collection(db,col),orderBy("createdAt","desc")));
-      setItems(snap.empty?defaults:snap.docs.map(d=>({id:d.id,...d.data()})));
+      if (snap.empty) {
+        setItems(defaults);
+      } else {
+        const docs=snap.docs.map((d,index)=>({id:d.id,...d.data(),__fallbackOrder:index}));
+        docs.sort((a,b)=>{
+          const ao=Number.isFinite(a.order)?a.order:a.__fallbackOrder;
+          const bo=Number.isFinite(b.order)?b.order:b.__fallbackOrder;
+          return ao-bo;
+        });
+        docs.forEach(item=>{delete item.__fallbackOrder;});
+        setItems(docs);
+      }
     } catch { setItems(defaults); } finally { setLoading(false); }
   };
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
   useEffect(()=>{fetch();},[]);
   return {items,loading,fetch};
 }
@@ -229,29 +295,66 @@ export default function App() {
 
 function PortfolioPage() {
   const [search,setSearch]=useState("");
+  const [activePage,setActivePage]=useState(0);
+  const pageSwipeRef=useRef({x:0,y:0,skip:false});
   const navigate=useNavigate();
   useScrollReveal(); useCubeReaction();
   const {profile,profileLoading}=useProfile();
   const {items:skills,loading:sl}=useCollection("skills",defaultSkills);
   const {items:projects,loading:pl}=useCollection("projects",defaultProjects);
   const {items:certs,loading:cl}=useCollection("certificates",defaultCertificates);
+  const {items:resources,loading:rl}=useCollection("resources",defaultResources);
   const filtered=useMemo(()=>{
     const v=search.toLowerCase();
-    return projects.filter(p=>p.title?.toLowerCase().includes(v)||p.tech?.toLowerCase().includes(v)||p.description?.toLowerCase().includes(v));
+    return projects.filter(p=>p.title?.toLowerCase().includes(v)||p.tech?.toLowerCase().includes(v)||p.description?.toLowerCase().includes(v)||p.experience?.toLowerCase().includes(v));
   },[projects,search]);
-  if(profileLoading||sl||pl||cl) return <Loader />;
+  if(profileLoading||sl||pl||cl||rl) return <Loader />;
+  const goToPage=(page)=>setActivePage(Math.max(0,Math.min(page,1)));
+  const startPageSwipe=(e)=>{
+    const touch=e.touches?.[0];
+    if(!touch) return;
+    pageSwipeRef.current={
+      x:touch.clientX,
+      y:touch.clientY,
+      skip:Boolean(e.target.closest(".notes-track")),
+    };
+  };
+  const endPageSwipe=(e)=>{
+    const touch=e.changedTouches?.[0];
+    const swipe=pageSwipeRef.current;
+    if(!touch||swipe.skip) return;
+    const dx=touch.clientX-swipe.x;
+    const dy=touch.clientY-swipe.y;
+    if(Math.abs(dx)<70||Math.abs(dx)<Math.abs(dy)*1.2) return;
+    goToPage(dx<0 ? 1 : 0);
+  };
   return (
-    <div className="bo-page">
+    <div className={`bo-page two-page-shell page-${activePage}`}>
       <AdminBtn onAdmin={()=>navigate("/admin")} />
-      <main>
-        <Hero profile={profile} />
-        <About profile={profile} />
-        <Skills skills={skills} />
-        <Projects projects={filtered} search={search} setSearch={setSearch} />
-        <Certificates certs={certs} />
-        <Contact profile={profile} />
-      </main>
-      <Footer />
+      <div className="page-slider-controls" aria-label="Portfolio pages">
+        <button type="button" className={activePage===0?"active":""} onClick={()=>goToPage(0)}>Portfolio</button>
+        <button type="button" className={activePage===1?"active":""} onClick={()=>goToPage(1)}>Notes & Resources</button>
+      </div>
+      <button type="button" className="page-arrow page-arrow-left" onClick={()=>goToPage(0)} disabled={activePage===0} aria-label="Show portfolio page">&lsaquo;</button>
+      <button type="button" className="page-arrow page-arrow-right" onClick={()=>goToPage(1)} disabled={activePage===1} aria-label="Show notes and resources page">&rsaquo;</button>
+      <div className="portfolio-slider" onTouchStart={startPageSwipe} onTouchEnd={endPageSwipe}>
+        <div className="portfolio-slider-track" style={{"--active-page":activePage}}>
+          <div className="portfolio-slide portfolio-slide-main">
+            <main>
+              <Hero profile={profile} />
+              <About profile={profile} />
+              <Skills skills={skills} />
+              <Projects projects={filtered} search={search} setSearch={setSearch} />
+              <Certificates certs={certs} />
+              <Contact profile={profile} />
+            </main>
+            <Footer />
+          </div>
+          <div className="portfolio-slide portfolio-slide-notes">
+            <Notes resources={resources} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -262,9 +365,11 @@ function AdminPage() {
   const {items:skills,loading:sl,fetch:fs}=useCollection("skills",defaultSkills);
   const {items:projects,loading:pl,fetch:fp}=useCollection("projects",defaultProjects);
   const {items:certs,loading:cl,fetch:fc}=useCollection("certificates",defaultCertificates);
+  const {items:resources,loading:rl,fetch:fr}=useCollection("resources",defaultResources);
   const {items:msgs,loading:ml,fetch:fm}=useCollection("messages",[]);
-  if(profileLoading||sl||pl||cl||ml) return <Loader />;
-  return <AdminPanel projects={projects} fetchProjects={fp} certificates={certs} fetchCertificates={fc} messages={msgs} fetchMessages={fm} profile={profile} setProfile={setProfile} skills={skills} fetchSkills={fs} onClose={()=>navigate("/")} />;
+  const {items:feedback,loading:fl,fetch:ff}=useCollection("feedback",[]);
+  if(profileLoading||sl||pl||cl||rl||ml||fl) return <Loader />;
+  return <AdminPanel projects={projects} fetchProjects={fp} certificates={certs} fetchCertificates={fc} resources={resources} fetchResources={fr} messages={msgs} fetchMessages={fm} feedback={feedback} fetchFeedback={ff} profile={profile} setProfile={setProfile} skills={skills} fetchSkills={fs} onClose={()=>navigate("/")} />;
 }
 
 /* ─── Loader ─── */
@@ -283,15 +388,18 @@ function AdminBtn({onAdmin}) {
 }
 
 /* ─── HERO ─── */
+/* eslint-disable no-undef */
 function Hero({profile}) {
   const roles = ["Java Developer","React Builder","Web Developer","MCA Student","Full-Stack Dev"];
   const typed = useTypewriter(roles);
+  const showFeedbackModal = false;
   const stats = [
     {num:"3+",label:"Projects Built"},
     {num:"12+",label:"Skills Mastered"},
     {num:"4+",label:"Certificates"},
   ];
   return (
+    <>
     <section id="home" className="hero-section">
       {/* animated bg orbs */}
       <div className="hero-orb orb1" />
@@ -370,17 +478,43 @@ function Hero({profile}) {
         <span className="scroll-label">Scroll</span>
       </a>
     </section>
+    {showFeedbackModal && (
+      <div className="rating-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="rating-modal-title">
+        <div className="rating-modal">
+          <button className="rating-modal-close" onClick={closeFeedbackModal} aria-label="Close rating popup">×</button>
+          <div className="section-label rating-modal-label">Quick Feedback</div>
+          <h3 id="rating-modal-title" className="rating-modal-title">Rate this portfolio</h3>
+          <p className="rating-modal-subtitle">Your rating and suggestion help me improve this page.</p>
+          <input value={feedback.name} onChange={e=>setFeedbackField("name",e.target.value)} className="contact-input rating-name" placeholder="Your name (optional)" />
+          <div className="rating-stars" aria-label="Portfolio rating">
+            {[1,2,3,4,5].map(star=>(
+              <button key={star} type="button" className={star<=feedback.rating?"active":""} onClick={()=>setFeedbackField("rating",star)} aria-label={`${star} star rating`}>
+                ★
+              </button>
+            ))}
+          </div>
+          <textarea value={feedback.suggestion} onChange={e=>setFeedbackField("suggestion",e.target.value)} className="contact-input rating-textarea" placeholder="Write your suggestion..." />
+          <button className="send-btn rating-send" onClick={sendFeedback} disabled={feedbackLoading}>
+            {feedbackLoading ? <><span className="btn-spinner"/>Saving...</> : "Submit Rating"}
+          </button>
+          {feedbackStatus && <p className={`form-status ${feedbackStatus.startsWith("Thanks")?"success":"error"}`}>{feedbackStatus}</p>}
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
 /* ─── ABOUT ─── */
 function About({profile}) {
+  const showFeedbackModal = false;
   const cards = [
     {icon:"🎓",title:"Education",text:profile.education,color:"#b18025"},
     {icon:"⚙️",title:"Development",text:profile.development,color:"#31596b"},
     {icon:"🎯",title:"Goal",text:profile.goal,color:"#3d6b31"},
   ];
   return (
+    <>
     <section id="about" className="section about-section">
       <div className="section-inner">
         <div className="section-label reveal-target">About Me</div>
@@ -400,10 +534,35 @@ function About({profile}) {
       </div>
       <span className="bo-cube one" /><span className="bo-cube two" />
     </section>
+    {showFeedbackModal && (
+      <div className="rating-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="rating-modal-title">
+        <div className="rating-modal">
+          <button className="rating-modal-close" onClick={closeFeedbackModal} aria-label="Close rating popup">×</button>
+          <div className="section-label rating-modal-label">Quick Feedback</div>
+          <h3 id="rating-modal-title" className="rating-modal-title">Rate this portfolio</h3>
+          <p className="rating-modal-subtitle">Your rating and suggestion help me improve this page.</p>
+          <input value={feedback.name} onChange={e=>setFeedbackField("name",e.target.value)} className="contact-input rating-name" placeholder="Your name (optional)" />
+          <div className="rating-stars" aria-label="Portfolio rating">
+            {[1,2,3,4,5].map(star=>(
+              <button key={star} type="button" className={star<=feedback.rating?"active":""} onClick={()=>setFeedbackField("rating",star)} aria-label={`${star} star rating`}>
+                ★
+              </button>
+            ))}
+          </div>
+          <textarea value={feedback.suggestion} onChange={e=>setFeedbackField("suggestion",e.target.value)} className="contact-input rating-textarea" placeholder="Write your suggestion..." />
+          <button className="send-btn rating-send" onClick={sendFeedback} disabled={feedbackLoading}>
+            {feedbackLoading ? <><span className="btn-spinner"/>Saving...</> : "Submit Rating"}
+          </button>
+          {feedbackStatus && <p className={`form-status ${feedbackStatus.startsWith("Thanks")?"success":"error"}`}>{feedbackStatus}</p>}
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
 /* ─── SKILLS ─── */
+/* eslint-enable no-undef */
 function Skills({skills}) {
   const categories=[...new Set(skills.map(s=>s.category||"Other"))];
   const featuredSkills = [
@@ -477,6 +636,7 @@ function Projects({projects,search,setSearch}) {
                   <div className="project-body">
                     <h3 className="project-title">{p.title}</h3>
                     <p className="project-desc">{p.description}</p>
+                    {p.experience && <p className="project-experience"><span>Experience</span>{p.experience}</p>}
                     <div className="project-tech">
                       {p.tech.split(",").map(t=><span key={t} className="tech-badge">{t.trim()}</span>)}
                     </div>
@@ -492,6 +652,114 @@ function Projects({projects,search,setSearch}) {
 }
 
 /* ─── CERTIFICATES ─── */
+/* NOTES */
+function Notes({resources=defaultResources}) {
+  const [active,setActive]=useState(0);
+  const trackRef=useRef(null);
+  const dragRef=useRef({down:false,startX:0,scrollLeft:0});
+
+  const scrollToNote=(index)=>{
+    const nextIndex=Math.max(0,Math.min(index,resources.length-1));
+    const track=trackRef.current;
+    const card=track?.children?.[nextIndex];
+    setActive(nextIndex);
+    if(card) card.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
+  };
+  const moveNote=(step)=>scrollToNote((active+step+resources.length)%resources.length);
+  const updateActive=()=>{
+    const track=trackRef.current;
+    if(!track) return;
+    const center=track.scrollLeft+(track.clientWidth/2);
+    let closest=0;
+    let distance=Infinity;
+    Array.from(track.children).forEach((card,index)=>{
+      const cardCenter=card.offsetLeft+(card.clientWidth/2);
+      const diff=Math.abs(center-cardCenter);
+      if(diff<distance){distance=diff;closest=index;}
+    });
+    setActive(closest);
+  };
+  const startDrag=(clientX)=>{
+    const track=trackRef.current;
+    if(!track) return;
+    dragRef.current={down:true,startX:clientX,scrollLeft:track.scrollLeft};
+    track.classList.add("is-dragging");
+  };
+  const dragMove=(clientX)=>{
+    const track=trackRef.current;
+    if(!track||!dragRef.current.down) return;
+    track.scrollLeft=dragRef.current.scrollLeft-(clientX-dragRef.current.startX);
+  };
+  const endDrag=()=>{
+    const track=trackRef.current;
+    if(!track) return;
+    dragRef.current.down=false;
+    track.classList.remove("is-dragging");
+    updateActive();
+  };
+
+  return (
+    <section id="notes" className="section notes-section">
+      <div className="section-inner">
+        <div className="notes-header">
+          <div>
+            <div className="section-label reveal-target">Learning Resources</div>
+            <h2 className="section-title reveal-target">Notes & Resources</h2>
+            <p className="section-subtitle reveal-target">Swipe through my notes for AI/ML, Java, Power BI, STQA and web development.</p>
+          </div>
+          <div className="notes-controls reveal-target" aria-label="Notes carousel controls">
+            <button type="button" className="note-nav-btn" onClick={()=>moveNote(-1)} aria-label="Previous note">&lsaquo;</button>
+            <button type="button" className="note-nav-btn" onClick={()=>moveNote(1)} aria-label="Next note">&rsaquo;</button>
+          </div>
+        </div>
+
+        <div
+          ref={trackRef}
+          className="notes-track reveal-target"
+          onScroll={updateActive}
+          onMouseDown={e=>startDrag(e.clientX)}
+          onMouseMove={e=>dragMove(e.clientX)}
+          onMouseUp={endDrag}
+          onMouseLeave={endDrag}
+          onTouchStart={e=>startDrag(e.touches[0].clientX)}
+          onTouchMove={e=>dragMove(e.touches[0].clientX)}
+          onTouchEnd={endDrag}
+        >
+          {resources.map((note,index)=>{
+            const topics=Array.isArray(note.topics) ? note.topics : String(note.topics||"").split(",").map(topic=>topic.trim()).filter(Boolean);
+            return (
+            <article key={note.title} className="note-card" style={{"--note-accent":note.accent,"--delay":`${index*90}ms`}}>
+              <div className="note-card-top">
+                <span className="note-index">{String(index+1).padStart(2,"0")}</span>
+                <span className="note-tag">{note.tag}</span>
+              </div>
+              <h3 className="note-title">{note.title}</h3>
+              <p className="note-summary">{note.summary}</p>
+              <div className="note-topic-list">
+                {topics.map(topic=><span key={topic}>{topic}</span>)}
+              </div>
+              <a className="note-link" href={formatUrl(note.href)} target="_blank" rel="noreferrer">Explore Notes</a>
+            </article>
+          )})}
+        </div>
+
+        <div className="notes-dots reveal-target" aria-label="Choose note">
+          {resources.map((note,index)=>(
+            <button
+              key={note.title}
+              type="button"
+              className={index===active?"active":""}
+              onClick={()=>scrollToNote(index)}
+              aria-label={`Show ${note.title}`}
+            />
+          ))}
+        </div>
+      </div>
+      <span className="bo-cube one" /><span className="bo-cube two" />
+    </section>
+  );
+}
+
 function SectionMascot({ mode, items=[] }) {
   const isSkills = mode === "skills";
   const boardItems = isSkills ? items : ["Code", "Live", "Search"];
@@ -541,6 +809,7 @@ function Certificates({certs}) {
               <div className="cert-body">
                 <h3 className="cert-title">{c.title}</h3>
                 <p className="cert-provider">{c.provider}</p>
+                {c.experience && <p className="cert-experience"><span>Experience</span>{c.experience}</p>}
                 <span className="cert-date">{c.date}</span>
                 {c.credentialUrl && c.credentialUrl!=="#" &&
                   <a href={formatUrl(c.credentialUrl)} target="_blank" rel="noreferrer" className="cert-link">View Credential ↗</a>
@@ -558,17 +827,58 @@ function Certificates({certs}) {
 /* ─── CONTACT ─── */
 function Contact({profile}) {
   const [form,setForm]=useState({name:"",email:"",message:""});
+  const [feedback,setFeedback]=useState({name:"",email:"",rating:0,suggestion:""});
   const [status,setStatus]=useState("");
+  const [feedbackStatus,setFeedbackStatus]=useState("");
   const [loading,setLoading]=useState(false);
-  const set=(f,v)=>setForm(p=>({...p,[f]:v}));
+  const [feedbackLoading,setFeedbackLoading]=useState(false);
+  const [showFeedbackModal,setShowFeedbackModal]=useState(false);
+  const set=(f,v)=>{
+    setForm(p=>({...p,[f]:v}));
+    if(f==="email" && isValidEmail(v)){
+      setFeedback(p=>p.email.trim() ? p : {...p,email:v.trim()});
+    }
+  };
+  const setFeedbackField=(f,v)=>setFeedback(p=>({...p,[f]:v}));
+  useEffect(()=>{
+    if(sessionStorage.getItem("portfolioFeedbackClosed")==="true"||localStorage.getItem("portfolioFeedbackSent")==="true") return;
+    const timer=setTimeout(()=>setShowFeedbackModal(true),20000);
+    return ()=>clearTimeout(timer);
+  },[]);
+  const closeFeedbackModal=()=>{
+    sessionStorage.setItem("portfolioFeedbackClosed","true");
+    setShowFeedbackModal(false);
+  };
   const send=async()=>{
     if(!form.name.trim()||!form.email.trim()||!form.message.trim()){setStatus("⚠ Please fill all fields.");return;}
+    if(!isValidEmail(form.email)){setStatus("Please enter a valid email.");return;}
     try {
       setLoading(true); setStatus("");
-      await addDoc(collection(db,"messages"),{...form,status:"new",createdAt:serverTimestamp()});
+      await addDoc(collection(db,"messages"),{...form,email:form.email.trim(),status:"new",createdAt:serverTimestamp()});
       setForm({name:"",email:"",message:""}); setStatus("✓ Message sent successfully!");
     } catch { setStatus("✗ Failed to send. Try again."); } finally {
       setLoading(false); setTimeout(()=>setStatus(""),3500);
+    }
+  };
+  const sendFeedback=async()=>{
+    if(!feedback.rating){setFeedbackStatus("Please select a rating.");return;}
+    if(!isValidEmail(feedback.email)){setFeedbackStatus("Please enter a valid email.");return;}
+    if(!feedback.suggestion.trim()){setFeedbackStatus("Please write a suggestion.");return;}
+    try {
+      setFeedbackLoading(true); setFeedbackStatus("");
+      await addDoc(collection(db,"feedback"),{
+        name:feedback.name.trim(),
+        email:feedback.email.trim(),
+        rating:Number(feedback.rating),
+        suggestion:feedback.suggestion.trim(),
+        status:"new",
+        createdAt:serverTimestamp()
+      });
+      setFeedback({name:"",email:"",rating:0,suggestion:""}); setFeedbackStatus("Thanks for your feedback!");
+      localStorage.setItem("portfolioFeedbackSent","true");
+      setTimeout(()=>setShowFeedbackModal(false),900);
+    } catch { setFeedbackStatus("Failed to send feedback. Try again."); } finally {
+      setFeedbackLoading(false); setTimeout(()=>setFeedbackStatus(""),3500);
     }
   };
   const links=[
@@ -578,6 +888,7 @@ function Contact({profile}) {
     {label:"Email",href:formatMailto(profile.email)},
   ];
   return (
+    <>
     <section id="contact" className="section contact-section">
       <div className="section-inner">
         <div className="section-label reveal-target">Get In Touch</div>
@@ -618,11 +929,53 @@ function Contact({profile}) {
               <p className="map-label">Based in India</p>
               <p className="map-sub">Open to remote & hybrid work</p>
             </div>
+            <div className="rating-card">
+              <h3 className="info-card-title">Rate this portfolio</h3>
+              <input value={feedback.name} onChange={e=>setFeedbackField("name",e.target.value)} className="contact-input rating-name" placeholder="Your name (optional)" />
+              <input type="email" value={feedback.email} onChange={e=>setFeedbackField("email",e.target.value)} className="contact-input rating-name" placeholder="Your email" autoComplete="email" />
+              <div className="rating-stars" aria-label="Portfolio rating">
+                {[1,2,3,4,5].map(star=>(
+                  <button key={star} type="button" className={star<=feedback.rating?"active":""} onClick={()=>setFeedbackField("rating",star)} aria-label={`${star} star rating`}>
+                    ★
+                  </button>
+                ))}
+              </div>
+              <textarea value={feedback.suggestion} onChange={e=>setFeedbackField("suggestion",e.target.value)} className="contact-input rating-textarea" placeholder="Write your suggestion..." />
+              <button className="send-btn rating-send" onClick={sendFeedback} disabled={feedbackLoading}>
+                {feedbackLoading ? <><span className="btn-spinner"/>Saving...</> : "Submit Rating"}
+              </button>
+              {feedbackStatus && <p className={`form-status ${feedbackStatus.startsWith("Thanks")?"success":"error"}`}>{feedbackStatus}</p>}
+            </div>
           </div>
         </div>
       </div>
       <span className="bo-cube one" /><span className="bo-cube two" />
     </section>
+    {showFeedbackModal && (
+      <div className="rating-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="rating-modal-title">
+        <div className="rating-modal">
+          <button className="rating-modal-close" onClick={closeFeedbackModal} aria-label="Close rating popup">×</button>
+          <div className="section-label rating-modal-label">Quick Feedback</div>
+          <h3 id="rating-modal-title" className="rating-modal-title">Rate this portfolio</h3>
+          <p className="rating-modal-subtitle">Your rating and suggestion help me improve this page.</p>
+          <input value={feedback.name} onChange={e=>setFeedbackField("name",e.target.value)} className="contact-input rating-name" placeholder="Your name (optional)" />
+          <input type="email" value={feedback.email} onChange={e=>setFeedbackField("email",e.target.value)} className="contact-input rating-name" placeholder="Your email" autoComplete="email" />
+          <div className="rating-stars" aria-label="Portfolio rating">
+            {[1,2,3,4,5].map(star=>(
+              <button key={star} type="button" className={star<=feedback.rating?"active":""} onClick={()=>setFeedbackField("rating",star)} aria-label={`${star} star rating`}>
+                ★
+              </button>
+            ))}
+          </div>
+          <textarea value={feedback.suggestion} onChange={e=>setFeedbackField("suggestion",e.target.value)} className="contact-input rating-textarea" placeholder="Write your suggestion..." />
+          <button className="send-btn rating-send" onClick={sendFeedback} disabled={feedbackLoading}>
+            {feedbackLoading ? <><span className="btn-spinner"/>Saving...</> : "Submit Rating"}
+          </button>
+          {feedbackStatus && <p className={`form-status ${feedbackStatus.startsWith("Thanks")?"success":"error"}`}>{feedbackStatus}</p>}
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -642,9 +995,10 @@ function Footer() {
 /* ════════════════════════════════════════
    ADMIN PANEL (unchanged logic, new theme)
    ════════════════════════════════════════ */
-function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messages,fetchMessages,profile,setProfile,skills,fetchSkills,onClose}) {
-  const emptyProject={title:"",description:"",tech:"",github:"",demo:"",image:""};
-  const emptyCert={title:"",provider:"",date:"",imageUrl:"",credentialUrl:""};
+function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resources,fetchResources,messages,fetchMessages,feedback,fetchFeedback,profile,setProfile,skills,fetchSkills,onClose}) {
+  const emptyProject={title:"",description:"",experience:"",tech:"",github:"",demo:"",image:""};
+  const emptyCert={title:"",provider:"",date:"",experience:"",imageUrl:"",credentialUrl:""};
+  const emptyResource={title:"",tag:"",summary:"",topics:"",accent:"#4a9aa5",href:""};
 
   const [isLoggedIn,setIsLoggedIn]=useState(false);
   const [authLoading,setAuthLoading]=useState(true);
@@ -659,6 +1013,10 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messa
   const [editingCertId,setEditingCertId]=useState(null);
   const [certMsg,setCertMsg]=useState("");
 
+  const [resourceForm,setResourceForm]=useState(emptyResource);
+  const [editingResourceId,setEditingResourceId]=useState(null);
+  const [resourceMsg,setResourceMsg]=useState("");
+
   const [profileForm,setProfileForm]=useState(profile);
   const [profileMsg,setProfileMsg]=useState("");
 
@@ -667,9 +1025,10 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messa
   const [skillMsg,setSkillMsg]=useState("");
 
   const [msgStatus,setMsgStatus]=useState("");
+  const [feedbackAdminStatus,setFeedbackAdminStatus]=useState("");
   const [tab,setTab]=useState("profile");
 
-  const tabs=[{id:"profile",label:"Profile",icon:"👤"},{id:"skills",label:"Skills",icon:"💻"},{id:"projects",label:"Projects",icon:"💼"},{id:"certificates",label:"Certificates",icon:"🏆"},{id:"messages",label:"Messages",icon:"💬"}];
+  const tabs=[{id:"profile",label:"Profile",icon:"👤"},{id:"skills",label:"Skills",icon:"💻"},{id:"projects",label:"Projects",icon:"💼"},{id:"resources",label:"Resources",icon:"📚"},{id:"certificates",label:"Certificates",icon:"🏆"},{id:"messages",label:"Messages",icon:"💬"},{id:"feedback",label:"Feedback",icon:"★"}];
 
   useEffect(()=>{
     const unsub=onAuthStateChanged(auth,u=>{setIsLoggedIn(!!u);setAuthLoading(false);});
@@ -680,9 +1039,31 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messa
     try{setLoginError("");await signInWithEmailAndPassword(auth,loginData.email.trim(),loginData.password.trim());}
     catch{setLoginError("Invalid email or password.");}
   };
-  const logout=async()=>{try{await signOut(auth);setLoginData({email:"",password:""});onClose();}catch{}};
+  const logout=async()=>{try{await signOut(auth);setLoginData({email:"",password:""});onClose();}catch{/* ignore logout failures */}};
 
   const flash=(setter,msg)=>{setter(msg);setTimeout(()=>setter(""),2800);};
+
+  const reorderItems=async(collectionName,items,index,direction,fetchItems,setter,label,defaultIds)=>{
+    const nextIndex=index+direction;
+    if(nextIndex<0||nextIndex>=items.length) return;
+    if(items.some(item=>defaultIds.includes(String(item.id)))){
+      flash(setter,`Default ${label} order cannot be saved. Add your own ${label} first.`);
+      return;
+    }
+    const reordered=[...items];
+    [reordered[index],reordered[nextIndex]]=[reordered[nextIndex],reordered[index]];
+    try{
+      const batch=writeBatch(db);
+      reordered.forEach((item,order)=>{
+        batch.update(doc(db,collectionName,item.id),{order,updatedAt:serverTimestamp()});
+      });
+      await batch.commit();
+      await fetchItems();
+      flash(setter,"✓ Order updated.");
+    }catch{
+      flash(setter,"✗ Failed to update order.");
+    }
+  };
 
   const saveProfile=async()=>{
     try{await setDoc(doc(db,"profile","main"),{...profileForm,updatedAt:serverTimestamp()},{merge:true});setProfile(profileForm);flash(setProfileMsg,"✓ Profile saved.");}
@@ -693,7 +1074,7 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messa
     if(!skillForm.name.trim()||!skillForm.category.trim()){flash(setSkillMsg,"Fill name and category.");return;}
     try{
       if(editingSkillId) await updateDoc(doc(db,"skills",editingSkillId),{...skillForm,updatedAt:serverTimestamp()});
-      else await addDoc(collection(db,"skills"),{...skillForm,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+      else await addDoc(collection(db,"skills"),{...skillForm,order:skills.length,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
       setSkillForm({name:"",category:""});setEditingSkillId(null);await fetchSkills();flash(setSkillMsg,"✓ Skill saved.");
     }catch{flash(setSkillMsg,"✗ Failed.");}
   };
@@ -709,11 +1090,11 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messa
     try{
       const data={...form,github:form.github||"#",demo:form.demo||"#",image:form.image||DEFAULT_PROJECT_IMAGE};
       if(editingId) await updateDoc(doc(db,"projects",editingId),{...data,updatedAt:serverTimestamp()});
-      else await addDoc(collection(db,"projects"),{...data,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+      else await addDoc(collection(db,"projects"),{...data,order:projects.length,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
       setForm(emptyProject);setEditingId(null);await fetchProjects();flash(setProjectMsg,"✓ Project saved.");
     }catch{flash(setProjectMsg,"✗ Failed.");}
   };
-  const editProject=(p)=>{if(String(p.id).startsWith("dp")){flash(setProjectMsg,"Cannot edit default.");return;}setEditingId(p.id);setForm({title:p.title||"",description:p.description||"",tech:p.tech||"",github:p.github||"",demo:p.demo||"",image:p.image||""});};
+  const editProject=(p)=>{if(String(p.id).startsWith("dp")){flash(setProjectMsg,"Cannot edit default.");return;}setEditingId(p.id);setForm({title:p.title||"",description:p.description||"",experience:p.experience||"",tech:p.tech||"",github:p.github||"",demo:p.demo||"",image:p.image||""});};
   const deleteProject=async(id)=>{
     if(!window.confirm("Delete?")) return;
     if(String(id).startsWith("dp")){flash(setProjectMsg,"Cannot delete default.");return;}
@@ -724,20 +1105,57 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messa
     if(!certForm.title.trim()){flash(setCertMsg,"Fill certificate title.");return;}
     try{
       if(editingCertId) await updateDoc(doc(db,"certificates",editingCertId),{...certForm,updatedAt:serverTimestamp()});
-      else await addDoc(collection(db,"certificates"),{...certForm,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+      else await addDoc(collection(db,"certificates"),{...certForm,order:certificates.length,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
       setCertForm(emptyCert);setEditingCertId(null);await fetchCertificates();flash(setCertMsg,"✓ Saved.");
     }catch{flash(setCertMsg,"✗ Failed.");}
   };
-  const editCert=(c)=>{if(String(c.id).startsWith("dc")){flash(setCertMsg,"Cannot edit default.");return;}setEditingCertId(c.id);setCertForm({title:c.title||"",provider:c.provider||"",date:c.date||"",imageUrl:c.imageUrl||"",credentialUrl:c.credentialUrl||""});};
+  const editCert=(c)=>{if(String(c.id).startsWith("dc")){flash(setCertMsg,"Cannot edit default.");return;}setEditingCertId(c.id);setCertForm({title:c.title||"",provider:c.provider||"",date:c.date||"",experience:c.experience||"",imageUrl:c.imageUrl||"",credentialUrl:c.credentialUrl||""});};
   const deleteCert=async(id)=>{
     if(!window.confirm("Delete?")) return;
     if(String(id).startsWith("dc")){flash(setCertMsg,"Cannot delete default.");return;}
     try{await deleteDoc(doc(db,"certificates",id));await fetchCertificates();flash(setCertMsg,"✓ Deleted.");}catch{flash(setCertMsg,"✗ Failed.");}
   };
 
+  const saveResource=async()=>{
+    if(!resourceForm.title.trim()||!resourceForm.summary.trim()){flash(setResourceMsg,"Fill title and summary.");return;}
+    try{
+      const data={
+        ...resourceForm,
+        tag:resourceForm.tag||"Resource",
+        href:resourceForm.href||"#",
+        accent:resourceForm.accent||"#4a9aa5",
+        topics:String(resourceForm.topics||"").split(",").map(topic=>topic.trim()).filter(Boolean),
+      };
+      if(editingResourceId) await updateDoc(doc(db,"resources",editingResourceId),{...data,updatedAt:serverTimestamp()});
+      else await addDoc(collection(db,"resources"),{...data,order:resources.length,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+      setResourceForm(emptyResource);setEditingResourceId(null);await fetchResources();flash(setResourceMsg,"✓ Resource saved.");
+    }catch{flash(setResourceMsg,"✗ Failed.");}
+  };
+  const editResource=(r)=>{
+    if(String(r.id).startsWith("dr")){flash(setResourceMsg,"Cannot edit default resources.");return;}
+    setEditingResourceId(r.id);
+    setResourceForm({
+      title:r.title||"",
+      tag:r.tag||"",
+      summary:r.summary||"",
+      topics:Array.isArray(r.topics)?r.topics.join(", "):(r.topics||""),
+      accent:r.accent||"#4a9aa5",
+      href:r.href||"",
+    });
+  };
+  const deleteResource=async(id)=>{
+    if(!window.confirm("Delete this resource?")) return;
+    if(String(id).startsWith("dr")){flash(setResourceMsg,"Cannot delete default resources.");return;}
+    try{await deleteDoc(doc(db,"resources",id));await fetchResources();flash(setResourceMsg,"✓ Deleted.");}catch{flash(setResourceMsg,"✗ Failed.");}
+  };
+
   const markRead=async(id)=>{try{await updateDoc(doc(db,"messages",id),{status:"read",updatedAt:serverTimestamp()});await fetchMessages();flash(setMsgStatus,"✓ Marked as read.");}catch{flash(setMsgStatus,"✗ Failed.");}};
   const deleteMsg=async(id)=>{if(!window.confirm("Delete message?")) return;try{await deleteDoc(doc(db,"messages",id));await fetchMessages();flash(setMsgStatus,"✓ Deleted.");}catch{flash(setMsgStatus,"✗ Failed.");}};
   const fmtDate=(ts)=>ts?.toDate?ts.toDate().toLocaleString():"—";
+
+  const markFeedbackRead=async(id)=>{try{await updateDoc(doc(db,"feedback",id),{status:"read",updatedAt:serverTimestamp()});await fetchFeedback();flash(setFeedbackAdminStatus,"✓ Marked as read.");}catch{flash(setFeedbackAdminStatus,"✗ Failed.");}};
+  const deleteFeedback=async(id)=>{if(!window.confirm("Delete feedback?")) return;try{await deleteDoc(doc(db,"feedback",id));await fetchFeedback();flash(setFeedbackAdminStatus,"✓ Deleted.");}catch{flash(setFeedbackAdminStatus,"✗ Failed.");}};
+  const avgRating=feedback.length ? (feedback.reduce((sum,item)=>sum+Number(item.rating||0),0)/feedback.length).toFixed(1) : "0.0";
 
   if(authLoading) return <div className="admin-shell"><div className="admin-card"><p style={{color:"#324152"}}>Checking auth…</p></div></div>;
 
@@ -819,11 +1237,13 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messa
               {skillMsg && <span className="panel-msg">{skillMsg}</span>}
             </div>
             <div className="admin-items-grid">
-              {skills.map(s=>(
+              {skills.map((s,i)=>(
                 <div key={s.id} className="admin-item-card">
                   <div className="item-name">{s.name}</div>
                   <div className="item-sub">{s.category}</div>
                   <div className="item-actions">
+                    <button className="item-move" disabled={i===0} onClick={()=>reorderItems("skills",skills,i,-1,fetchSkills,setSkillMsg,"skills",defaultSkills.map(item=>item.id))}>Up</button>
+                    <button className="item-move" disabled={i===skills.length-1} onClick={()=>reorderItems("skills",skills,i,1,fetchSkills,setSkillMsg,"skills",defaultSkills.map(item=>item.id))}>Down</button>
                     <button className="item-edit" onClick={()=>{setEditingSkillId(s.id);setSkillForm({name:s.name,category:s.category});}}>Edit</button>
                     <button className="item-delete" onClick={()=>deleteSkill(s.id)}>Delete</button>
                   </div>
@@ -843,6 +1263,7 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messa
                 <input key={k} value={form[k]} onChange={e=>setForm(p=>({...p,[k]:e.target.value}))} placeholder={ph} className="admin-input" />
               ))}
               <textarea value={form.description} onChange={e=>setForm(p=>({...p,description:e.target.value}))} placeholder="Project description" className="admin-input admin-textarea" />
+              <textarea value={form.experience} onChange={e=>setForm(p=>({...p,experience:e.target.value}))} placeholder="Write experience for this project" className="admin-input admin-textarea" />
             </div>
             <div className="panel-footer">
               <button className="panel-save-btn" onClick={saveProject}><Save /> {editingId?"Update":"Save"} Project</button>
@@ -853,13 +1274,56 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messa
           <div className="admin-panel-box" style={{marginTop:"20px"}}>
             <h3 className="panel-title">All Projects</h3>
             <div className="admin-items-grid">
-              {projects.map(p=>(
+              {projects.map((p,i)=>(
                 <div key={p.id} className="admin-item-card">
                   <div className="item-name">{p.title}</div>
                   <div className="item-sub">{p.tech}</div>
                   <div className="item-actions">
+                    <button className="item-move" disabled={i===0} onClick={()=>reorderItems("projects",projects,i,-1,fetchProjects,setProjectMsg,"projects",defaultProjects.map(item=>item.id))}>Up</button>
+                    <button className="item-move" disabled={i===projects.length-1} onClick={()=>reorderItems("projects",projects,i,1,fetchProjects,setProjectMsg,"projects",defaultProjects.map(item=>item.id))}>Down</button>
                     <button className="item-edit" onClick={()=>editProject(p)}><Pencil /> Edit</button>
                     <button className="item-delete" onClick={()=>deleteProject(p.id)}><Trash2 /> Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          </>
+        )}
+
+        {/* resources */}
+        {tab==="resources" && (
+          <>
+          <div className="admin-panel-box">
+            <h3 className="panel-title">{editingResourceId?"Edit":"Add"} Resource / Note</h3>
+            <div className="admin-form-stack">
+              <div className="admin-grid-3">
+                <input value={resourceForm.title} onChange={e=>setResourceForm(p=>({...p,title:e.target.value}))} placeholder="Title, e.g. AI/ML Notes" className="admin-input" />
+                <input value={resourceForm.tag} onChange={e=>setResourceForm(p=>({...p,tag:e.target.value}))} placeholder="Tag, e.g. Intelligence" className="admin-input" />
+                <input type="color" value={resourceForm.accent} onChange={e=>setResourceForm(p=>({...p,accent:e.target.value}))} className="admin-input admin-color-input" aria-label="Resource accent color" />
+              </div>
+              <input value={resourceForm.href} onChange={e=>setResourceForm(p=>({...p,href:e.target.value}))} placeholder="Resource link / Google Drive / notes URL" className="admin-input" />
+              <textarea value={resourceForm.summary} onChange={e=>setResourceForm(p=>({...p,summary:e.target.value}))} placeholder="Short summary for this resource" className="admin-input admin-textarea" />
+              <input value={resourceForm.topics} onChange={e=>setResourceForm(p=>({...p,topics:e.target.value}))} placeholder="Topics separated by commas, e.g. OOP, JDBC, Servlet/JSP" className="admin-input" />
+            </div>
+            <div className="panel-footer">
+              <button className="panel-save-btn" onClick={saveResource}><Save /> {editingResourceId?"Update":"Save"} Resource</button>
+              {editingResourceId && <button className="panel-cancel-btn" onClick={()=>{setEditingResourceId(null);setResourceForm(emptyResource);}}>Cancel</button>}
+              {resourceMsg && <span className="panel-msg">{resourceMsg}</span>}
+            </div>
+          </div>
+          <div className="admin-panel-box" style={{marginTop:"20px"}}>
+            <h3 className="panel-title">All Notes & Resources</h3>
+            <div className="admin-items-grid">
+              {resources.map((r,i)=>(
+                <div key={r.id} className="admin-item-card">
+                  <div className="item-name">{r.title}</div>
+                  <div className="item-sub">{r.tag} • {(Array.isArray(r.topics)?r.topics.join(", "):r.topics)||"No topics"}</div>
+                  <div className="item-actions">
+                    <button className="item-move" disabled={i===0} onClick={()=>reorderItems("resources",resources,i,-1,fetchResources,setResourceMsg,"resources",defaultResources.map(item=>item.id))}>Up</button>
+                    <button className="item-move" disabled={i===resources.length-1} onClick={()=>reorderItems("resources",resources,i,1,fetchResources,setResourceMsg,"resources",defaultResources.map(item=>item.id))}>Down</button>
+                    <button className="item-edit" onClick={()=>editResource(r)}><Pencil /> Edit</button>
+                    <button className="item-delete" onClick={()=>deleteResource(r.id)}><Trash2 /> Delete</button>
                   </div>
                 </div>
               ))}
@@ -877,6 +1341,7 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messa
               {[["title","Certificate title"],["provider","Provider / Organization"],["date","Date, e.g. 2026"],["imageUrl","Image URL or Google Drive link"],["credentialUrl","Credential URL"]].map(([k,ph])=>(
                 <input key={k} value={certForm[k]} onChange={e=>setCertForm(p=>({...p,[k]:e.target.value}))} placeholder={ph} className="admin-input" />
               ))}
+              <textarea value={certForm.experience} onChange={e=>setCertForm(p=>({...p,experience:e.target.value}))} placeholder="Write experience for this certificate" className="admin-input admin-textarea" />
             </div>
             <div className="panel-footer">
               <button className="panel-save-btn" onClick={saveCert}><Save /> {editingCertId?"Update":"Save"} Certificate</button>
@@ -887,11 +1352,13 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messa
           <div className="admin-panel-box" style={{marginTop:"20px"}}>
             <h3 className="panel-title">All Certificates</h3>
             <div className="admin-items-grid">
-              {certificates.map(c=>(
+              {certificates.map((c,i)=>(
                 <div key={c.id} className="admin-item-card">
                   <div className="item-name">{c.title}</div>
                   <div className="item-sub">{c.provider} • {c.date}</div>
                   <div className="item-actions">
+                    <button className="item-move" disabled={i===0} onClick={()=>reorderItems("certificates",certificates,i,-1,fetchCertificates,setCertMsg,"certificates",defaultCertificates.map(item=>item.id))}>Up</button>
+                    <button className="item-move" disabled={i===certificates.length-1} onClick={()=>reorderItems("certificates",certificates,i,1,fetchCertificates,setCertMsg,"certificates",defaultCertificates.map(item=>item.id))}>Down</button>
                     <button className="item-edit" onClick={()=>editCert(c)}><Pencil /> Edit</button>
                     <button className="item-delete" onClick={()=>deleteCert(c.id)}><Trash2 /> Delete</button>
                   </div>
@@ -928,6 +1395,42 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,messa
                         <button className="item-edit" onClick={()=>markRead(m.id)}>Mark Read</button>
                         <a href={formatMailto(m.email)} className="item-edit" style={{textDecoration:"none",display:"inline-flex",alignItems:"center"}}>Reply</a>
                         <button className="item-delete" onClick={()=>deleteMsg(m.id)}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+            }
+          </div>
+        )}
+
+        {/* feedback */}
+        {tab==="feedback" && (
+          <div className="admin-panel-box">
+            <div className="panel-footer" style={{marginBottom:"16px"}}>
+              <h3 className="panel-title" style={{margin:0}}>Page Feedback</h3>
+              <span className="feedback-summary">Average {avgRating}/5 from {feedback.length} rating{feedback.length===1?"":"s"}</span>
+              <button className="panel-cancel-btn" onClick={fetchFeedback}>Refresh</button>
+              {feedbackAdminStatus && <span className="panel-msg">{feedbackAdminStatus}</span>}
+            </div>
+            {feedback.length===0
+              ? <p style={{color:"#324152",padding:"20px"}}>No ratings yet.</p>
+              : <div className="msg-grid">
+                  {feedback.map(item=>(
+                    <div key={item.id} className="msg-card">
+                      <div className="msg-header">
+                        <div>
+                          <div className="msg-name">{item.name?.trim()||"Anonymous visitor"}</div>
+                          {item.email && <a href={formatMailto(item.email)} className="msg-email">{item.email}</a>}
+                          <div className="feedback-stars">{"★".repeat(Number(item.rating||0))}{"☆".repeat(5-Number(item.rating||0))}</div>
+                        </div>
+                        <span className={`msg-badge ${item.status==="read"?"read":"new"}`}>{item.status||"new"}</span>
+                      </div>
+                      <p className="msg-text"><LinkifiedText text={item.suggestion} /></p>
+                      <p className="msg-date">{fmtDate(item.createdAt)}</p>
+                      <div className="item-actions">
+                        <button className="item-edit" onClick={()=>markFeedbackRead(item.id)}>Mark Read</button>
+                        {item.email && <a href={formatMailto(item.email)} className="item-edit" style={{textDecoration:"none",display:"inline-flex",alignItems:"center"}}>Reply</a>}
+                        <button className="item-delete" onClick={()=>deleteFeedback(item.id)}>Delete</button>
                       </div>
                     </div>
                   ))}
