@@ -173,6 +173,7 @@ const defaultProfile = {
   email:"ga8774040@gmail.com", github:"https://github.com/cskfan07",
   linkedin:"https://www.linkedin.com/in/ankit-gupta2201?utm_source=share_via&utm_content=profile&utm_medium=member_android",
   instagram:"mky_2201", resumeUrl:"#",
+  maintenanceMode:false,
 };
 const defaultSkills = [
   {id:"d1",name:"Java",category:"Backend"},{id:"d2",name:"Servlet/JSP",category:"Backend"},
@@ -309,6 +310,7 @@ function PortfolioPage() {
     return projects.filter(p=>p.title?.toLowerCase().includes(v)||p.tech?.toLowerCase().includes(v)||p.description?.toLowerCase().includes(v)||p.experience?.toLowerCase().includes(v));
   },[projects,search]);
   if(profileLoading||sl||pl||cl||rl) return <Loader />;
+  if(profile.maintenanceMode) return <MaintenancePage />;
   const goToPage=(page)=>setActivePage(Math.max(0,Math.min(page,1)));
   const startPageSwipe=(e)=>{
     const touch=e.touches?.[0];
@@ -383,6 +385,39 @@ function Loader() {
 }
 
 /* ─── Admin button (fixed) ─── */
+function MaintenancePage() {
+  return (
+    <div className="maintenance-screen">
+      <div className="maintenance-card">
+        <div className="repair-scene" aria-hidden="true">
+          <div className="repair-boy">
+            <span className="boy-head" />
+            <span className="boy-body" />
+            <span className="boy-arm" />
+            <span className="boy-leg left" />
+            <span className="boy-leg right" />
+          </div>
+          <div className="repair-car">
+            <span className="car-cabin" />
+            <span className="car-body" />
+            <span className="car-hood" />
+            <span className="car-wheel left" />
+            <span className="car-wheel right" />
+          </div>
+          <span className="car-part wrench" />
+          <span className="car-part bolt one" />
+          <span className="car-part bolt two" />
+          <span className="car-part tire" />
+          <span className="car-part panel" />
+        </div>
+        <div className="maintenance-label">Maintenance Mode</div>
+        <h1>Website maintenance error</h1>
+        <p>This website is temporarily unavailable while maintenance is in progress.</p>
+      </div>
+    </div>
+  );
+}
+
 function AdminBtn({onAdmin}) {
   return <button className="bo-admin" onClick={onAdmin}>Admin</button>;
 }
@@ -1070,6 +1105,18 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resou
     catch{flash(setProfileMsg,"✗ Failed to save.");}
   };
 
+  const toggleMaintenance=async()=>{
+    const nextMode=!profileForm.maintenanceMode;
+    try{
+      await setDoc(doc(db,"profile","main"),{maintenanceMode:nextMode,updatedAt:serverTimestamp()},{merge:true});
+      setProfileForm(p=>({...p,maintenanceMode:nextMode}));
+      setProfile({...profileForm,maintenanceMode:nextMode});
+      flash(setProfileMsg,nextMode?"Maintenance mode enabled.":"Maintenance mode disabled.");
+    }catch{
+      flash(setProfileMsg,"Failed to update maintenance mode.");
+    }
+  };
+
   const saveSkill=async()=>{
     if(!skillForm.name.trim()||!skillForm.category.trim()){flash(setSkillMsg,"Fill name and category.");return;}
     try{
@@ -1205,6 +1252,19 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resou
         {tab==="profile" && (
           <div className="admin-panel-box">
             <h3 className="panel-title">Manage Profile</h3>
+            <div className={`maintenance-toggle-card ${profileForm.maintenanceMode?"active":""}`}>
+              <div>
+                <p className="maintenance-toggle-title">Website Maintenance</p>
+                <p className="maintenance-toggle-copy">
+                  {profileForm.maintenanceMode
+                    ? "Visitors currently see only the maintenance error message."
+                    : "Visitors can currently see the full portfolio website."}
+                </p>
+              </div>
+              <button className="maintenance-toggle-btn" onClick={toggleMaintenance}>
+                {profileForm.maintenanceMode ? "Turn Off Maintenance" : "Turn On Maintenance"}
+              </button>
+            </div>
             <div className="admin-grid-2">
               {[["name","Name"],["title","Title"],["headline","Headline"],["email","Email"],["github","GitHub URL"],["linkedin","LinkedIn URL"],["instagram","Instagram"],["resumeUrl","Resume URL"]].map(([k,ph])=>(
                 <input key={k} value={profileForm[k]||""} onChange={e=>setProfileForm(p=>({...p,[k]:e.target.value}))} placeholder={ph} className="admin-input" />

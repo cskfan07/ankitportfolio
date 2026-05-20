@@ -73,6 +73,257 @@ img { display: block; max-width: 100%; }
   letter-spacing: 0.12em;
 }
 
+.maintenance-screen {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 50% 72%, rgba(212,150,45,0.16), transparent 28%),
+    linear-gradient(135deg, rgba(10,24,37,0.96), rgba(15,35,56,0.96)),
+    linear-gradient(rgba(242,234,219,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(242,234,219,0.045) 1px, transparent 1px);
+  background-size: auto, auto, 34px 34px, 34px 34px;
+  animation: maintenanceGridMove 12s linear infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  overflow: hidden;
+  position: relative;
+}
+.maintenance-card {
+  width: min(680px, 100%);
+  border: 1px solid rgba(242,234,219,0.18);
+  border-radius: var(--radius-lg);
+  background: rgba(242,234,219,0.08);
+  box-shadow: var(--shadow-lg);
+  padding: 30px 36px 42px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.repair-scene {
+  position: relative;
+  height: 190px;
+  margin: 0 auto 26px;
+}
+.repair-car {
+  position: absolute;
+  left: 50%;
+  bottom: 34px;
+  width: 280px;
+  height: 108px;
+  transform: translateX(-38%);
+}
+.car-body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 20px;
+  height: 64px;
+  border-radius: 24px 34px 18px 18px;
+  background: linear-gradient(135deg, #4a9aa5, #2e6b72);
+  box-shadow: inset 0 -12px 0 rgba(10,24,37,0.18);
+}
+.car-cabin {
+  position: absolute;
+  left: 72px;
+  top: 6px;
+  width: 112px;
+  height: 54px;
+  border-radius: 38px 38px 8px 8px;
+  background: linear-gradient(135deg, rgba(242,234,219,0.9), rgba(242,234,219,0.48));
+  border: 5px solid #2e6b72;
+}
+.car-hood {
+  position: absolute;
+  right: -18px;
+  bottom: 74px;
+  width: 72px;
+  height: 12px;
+  border-radius: 999px;
+  background: #d4962d;
+  transform: rotate(-18deg);
+  animation: hoodWobble 1.8s ease-in-out infinite;
+  transform-origin: left center;
+}
+.car-wheel {
+  position: absolute;
+  bottom: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #0f1a27;
+  border: 9px solid rgba(242,234,219,0.72);
+}
+.car-wheel.left { left: 42px; }
+.car-wheel.right { right: 44px; }
+.repair-boy {
+  position: absolute;
+  left: calc(50% - 235px);
+  bottom: 36px;
+  width: 94px;
+  height: 126px;
+  animation: boyWork 1.6s ease-in-out infinite;
+}
+.boy-head {
+  position: absolute;
+  left: 33px;
+  top: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #d6a06d;
+}
+.boy-body {
+  position: absolute;
+  left: 28px;
+  top: 36px;
+  width: 42px;
+  height: 52px;
+  border-radius: 14px 14px 10px 10px;
+  background: var(--accent-lt);
+}
+.boy-arm {
+  position: absolute;
+  left: 62px;
+  top: 48px;
+  width: 54px;
+  height: 12px;
+  border-radius: 999px;
+  background: #d6a06d;
+  transform: rotate(18deg);
+  transform-origin: left center;
+}
+.boy-arm::after {
+  content: "";
+  position: absolute;
+  right: -17px;
+  top: -4px;
+  width: 24px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--paper);
+  transform: rotate(-24deg);
+}
+.boy-leg {
+  position: absolute;
+  bottom: 0;
+  width: 15px;
+  height: 42px;
+  border-radius: 999px;
+  background: #132238;
+}
+.boy-leg.left {
+  left: 34px;
+  transform: rotate(8deg);
+}
+.boy-leg.right {
+  left: 55px;
+  transform: rotate(-10deg);
+}
+.car-part {
+  position: absolute;
+  display: block;
+  opacity: 0.92;
+}
+.car-part.wrench {
+  left: 20%;
+  bottom: 18px;
+  width: 62px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(242,234,219,0.8);
+  transform: rotate(-18deg);
+}
+.car-part.wrench::before {
+  content: "";
+  position: absolute;
+  right: -6px;
+  top: -7px;
+  width: 20px;
+  height: 20px;
+  border: 5px solid rgba(242,234,219,0.8);
+  border-left-color: transparent;
+  border-radius: 50%;
+}
+.car-part.bolt {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  background: var(--accent-lt);
+  animation: partFloat 2.4s ease-in-out infinite;
+}
+.car-part.bolt.one {
+  right: 20%;
+  bottom: 20px;
+}
+.car-part.bolt.two {
+  right: 31%;
+  bottom: 2px;
+  animation-delay: 0.55s;
+}
+.car-part.tire {
+  right: 14%;
+  bottom: 8px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 9px solid #0f1a27;
+  background: rgba(242,234,219,0.62);
+}
+.car-part.panel {
+  left: 33%;
+  bottom: 0;
+  width: 54px;
+  height: 20px;
+  border-radius: 6px;
+  background: #4a9aa5;
+  transform: rotate(9deg);
+}
+.maintenance-label {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(183,121,31,0.16);
+  color: var(--accent-lt);
+  border: 1px solid rgba(183,121,31,0.32);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+.maintenance-card h1 {
+  font-family: var(--font-head);
+  font-size: clamp(34px, 5vw, 58px);
+  line-height: 1.05;
+  color: var(--paper);
+  margin-bottom: 16px;
+}
+.maintenance-card p {
+  font-size: 16px;
+  line-height: 1.7;
+  color: rgba(242,234,219,0.68);
+}
+@keyframes maintenanceGridMove {
+  to { background-position: 0 0, 0 0, 34px 34px, 34px 34px; }
+}
+@keyframes hoodWobble {
+  0%, 100% { transform: rotate(-18deg); }
+  50% { transform: rotate(-10deg); }
+}
+@keyframes boyWork {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(3px) rotate(1.5deg); }
+}
+@keyframes partFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-5px) rotate(14deg); }
+}
+
 /* ─── Admin fixed button ─── */
 .bo-admin {
   position: fixed;
@@ -1866,6 +2117,47 @@ img { display: block; max-width: 100%; }
   color: var(--text);
   margin-bottom: 20px;
 }
+.maintenance-toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1.5px solid rgba(46,107,114,0.18);
+  border-radius: var(--radius-md);
+  background: rgba(46,107,114,0.08);
+  padding: 18px;
+  margin-bottom: 18px;
+}
+.maintenance-toggle-card.active {
+  border-color: rgba(220,38,38,0.28);
+  background: rgba(220,38,38,0.08);
+}
+.maintenance-toggle-title {
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+.maintenance-toggle-copy {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.maintenance-toggle-btn {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  background: var(--teal);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 900;
+  transition: transform 0.2s, filter 0.2s;
+}
+.maintenance-toggle-card.active .maintenance-toggle-btn { background: #dc2626; }
+.maintenance-toggle-btn:hover { transform: translateY(-1px); filter: brightness(1.06); }
 .admin-input {
   width: 100%;
   border: 1.5px solid rgba(19,34,56,0.2);
@@ -2073,14 +2365,22 @@ img { display: block; max-width: 100%; }
   .section-inner { padding: 60px 18px; }
   .hero-inner { padding: 90px 18px 50px; }
   .page-slider-controls {
-    top: auto;
-    bottom: 14px;
-    width: calc(100% - 36px);
+    top: 14px;
+    bottom: auto;
+    left: 14px;
+    right: 92px;
+    width: auto;
+    transform: none;
     justify-content: center;
+    gap: 5px;
+    padding: 4px;
   }
   .page-slider-controls button {
     flex: 1;
-    padding: 0 10px;
+    height: 30px;
+    padding: 0 8px;
+    font-size: 10px;
+    letter-spacing: 0;
   }
   .notes-header { gap: 18px; margin-bottom: 30px; }
   .notes-controls { width: 100%; justify-content: space-between; }
