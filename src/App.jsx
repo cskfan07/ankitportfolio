@@ -63,6 +63,10 @@ function formatImageUrl(url) {
   return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1200` : formatUrl(url);
 }
 const formatCertificateImageUrl = formatImageUrl;
+function formatDownloadUrl(url) {
+  const id = getGoogleDriveFileId(url);
+  return id ? `https://drive.google.com/uc?export=download&id=${id}` : formatUrl(url);
+}
 function formatMailto(e) { const c = (e||"").trim(); return c ? `mailto:${c}` : "#"; }
 function isValidEmail(e) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test((e || "").trim());
@@ -386,17 +390,19 @@ function Loader() {
 
 /* ─── Admin button (fixed) ─── */
 function MaintenancePage() {
+  const navigate = useNavigate();
+
   return (
     <div className="maintenance-screen">
       <div className="maintenance-card">
-        <div className="repair-scene" aria-hidden="true">
-          <div className="repair-boy">
+        <div className="repair-scene">
+          <button className="repair-boy admin-repair-link" onClick={() => navigate("/admin")} aria-label="Open admin login">
             <span className="boy-head" />
             <span className="boy-body" />
             <span className="boy-arm" />
             <span className="boy-leg left" />
             <span className="boy-leg right" />
-          </div>
+          </button>
           <div className="repair-car">
             <span className="car-cabin" />
             <span className="car-body" />
@@ -773,7 +779,7 @@ function Notes({resources=defaultResources}) {
               <div className="note-topic-list">
                 {topics.map(topic=><span key={topic}>{topic}</span>)}
               </div>
-              <a className="note-link" href={formatUrl(note.href)} target="_blank" rel="noreferrer">Explore Notes</a>
+              <a className="note-link" href={formatDownloadUrl(note.href)} target="_blank" rel="noreferrer" download>Download Notes</a>
             </article>
           )})}
         </div>

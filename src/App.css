@@ -75,6 +75,7 @@ img { display: block; max-width: 100%; }
 
 .maintenance-screen {
   min-height: 100vh;
+  min-height: 100svh;
   background:
     radial-gradient(circle at 50% 72%, rgba(212,150,45,0.16), transparent 28%),
     linear-gradient(135deg, rgba(10,24,37,0.96), rgba(15,35,56,0.96)),
@@ -86,7 +87,8 @@ img { display: block; max-width: 100%; }
   align-items: center;
   justify-content: center;
   padding: 28px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   position: relative;
 }
 .maintenance-card {
@@ -164,6 +166,21 @@ img { display: block; max-width: 100%; }
   width: 94px;
   height: 126px;
   animation: boyWork 1.6s ease-in-out infinite;
+}
+.admin-repair-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  transform-origin: center bottom;
+}
+.admin-repair-link:hover,
+.admin-repair-link:focus-visible {
+  filter: drop-shadow(0 12px 22px rgba(212,150,45,0.32));
+}
+.admin-repair-link:focus-visible {
+  outline: 2px solid var(--accent-lt);
+  outline-offset: 8px;
 }
 .boy-head {
   position: absolute;
@@ -2362,6 +2379,78 @@ img { display: block; max-width: 100%; }
 }
 
 @media (max-width: 600px) {
+  .maintenance-screen {
+    align-items: flex-start;
+    padding: 18px 14px;
+  }
+  .maintenance-card {
+    border-radius: 18px;
+    padding: 22px 16px 28px;
+    margin: auto 0;
+  }
+  .repair-scene {
+    height: 148px;
+    margin-bottom: 18px;
+    transform: scale(0.84);
+    transform-origin: center bottom;
+  }
+  .repair-car {
+    left: 50%;
+    bottom: 26px;
+    width: 238px;
+    height: 96px;
+    transform: translateX(-38%);
+  }
+  .car-body {
+    height: 56px;
+  }
+  .car-cabin {
+    left: 60px;
+    width: 96px;
+    height: 48px;
+  }
+  .car-hood {
+    right: -12px;
+    bottom: 66px;
+    width: 58px;
+  }
+  .car-wheel {
+    width: 40px;
+    height: 40px;
+    border-width: 8px;
+  }
+  .car-wheel.left { left: 34px; }
+  .car-wheel.right { right: 34px; }
+  .repair-boy {
+    left: calc(50% - 185px);
+    bottom: 28px;
+    transform-origin: center bottom;
+  }
+  .car-part.wrench { left: 12%; }
+  .car-part.tire {
+    right: 8%;
+    width: 36px;
+    height: 36px;
+    border-width: 8px;
+  }
+  .car-part.bolt.one { right: 13%; }
+  .car-part.bolt.two { right: 24%; }
+  .car-part.panel { left: 28%; }
+  .maintenance-label {
+    height: 28px;
+    padding: 0 12px;
+    font-size: 10px;
+    margin-bottom: 14px;
+  }
+  .maintenance-card h1 {
+    font-size: 30px;
+    line-height: 1.12;
+    margin-bottom: 12px;
+  }
+  .maintenance-card p {
+    font-size: 14px;
+    line-height: 1.55;
+  }
   .section-inner { padding: 60px 18px; }
   .hero-inner { padding: 90px 18px 50px; }
   .page-slider-controls {
