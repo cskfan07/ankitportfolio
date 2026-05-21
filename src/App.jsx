@@ -77,6 +77,16 @@ function formatInstagramUrl(v) {
   if (/^https?:\/\//i.test(c)||/^www\./i.test(c)) return formatUrl(c);
   return `https://www.instagram.com/${c.replace(/^@/,"")}`;
 }
+function buildProjectSpeechText(project) {
+  const tech = project.tech ? `Technology used: ${project.tech}.` : "";
+  const experience = project.experience ? `My experience from this project: ${project.experience}.` : "";
+  return [
+    `Project name is ${project.title}.`,
+    project.description,
+    tech,
+    experience,
+  ].filter(Boolean).join(" ");
+}
 function LinkifiedText({ text }) {
   const v = String(text||"");
   const pat = /(https?:\/\/[^\s]+|www\.[^\s]+|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
@@ -642,6 +652,40 @@ function Skills({skills}) {
 
 /* ─── PROJECTS ─── */
 function Projects({projects,search,setSearch}) {
+  const [speakingProjectId,setSpeakingProjectId]=useState("");
+  const [speechStatus,setSpeechStatus]=useState("");
+
+  useEffect(()=>{
+    return ()=>window.speechSynthesis?.cancel();
+  },[]);
+
+  const explainProject=(project)=>{
+    if(!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
+      setSpeechStatus("Speech is not supported in this browser.");
+      return;
+    }
+    if(speakingProjectId===project.id) {
+      window.speechSynthesis.cancel();
+      setSpeakingProjectId("");
+      setSpeechStatus("");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance=new window.SpeechSynthesisUtterance(buildProjectSpeechText(project));
+    utterance.lang="en-IN";
+    utterance.rate=1.12;
+    utterance.pitch=1;
+    utterance.onend=()=>setSpeakingProjectId("");
+    utterance.onerror=()=> {
+      setSpeakingProjectId("");
+      setSpeechStatus("Unable to play speech right now.");
+    };
+    setSpeechStatus("");
+    setSpeakingProjectId(project.id);
+    window.speechSynthesis.speak(utterance);
+  };
+
   return (
     <section id="projects" className="section projects-section">
       <div className="section-inner">
@@ -679,8 +723,18 @@ function Projects({projects,search,setSearch}) {
                     <p className="project-desc">{p.description}</p>
                     {p.experience && <p className="project-experience"><span>Experience</span>{p.experience}</p>}
                     <div className="project-tech">
-                      {p.tech.split(",").map(t=><span key={t} className="tech-badge">{t.trim()}</span>)}
+                      {String(p.tech||"").split(",").filter(Boolean).map(t=><span key={t} className="tech-badge">{t.trim()}</span>)}
                     </div>
+                    <div className="project-actions">
+                      <button
+                        type="button"
+                        className={`project-speech-btn ${speakingProjectId===p.id?"speaking":""}`}
+                        onClick={()=>explainProject(p)}
+                      >
+                        {speakingProjectId===p.id ? "Stop" : "Explain"}
+                      </button>
+                    </div>
+                    {speechStatus && <p className="project-speech-status">{speechStatus}</p>}
                   </div>
                 </article>
               ))}

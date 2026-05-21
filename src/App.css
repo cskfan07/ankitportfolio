@@ -1323,6 +1323,41 @@ img { display: block; max-width: 100%; }
    CERTIFICATES
    ══════════════════════════════════════ */
 /* NOTES */
+.project-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+.project-speech-btn {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  background: var(--teal);
+  color: #fff;
+  border: 1px solid rgba(46,107,114,0.2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 900;
+  transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
+}
+.project-speech-btn:hover {
+  transform: translateY(-1px);
+  background: var(--teal-lt);
+  box-shadow: 0 8px 18px rgba(46,107,114,0.2);
+}
+.project-speech-btn.speaking {
+  background: #dc2626;
+  border-color: rgba(220,38,38,0.22);
+}
+.project-speech-status {
+  margin-top: 10px;
+  color: #991b1b;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .notes-header {
   display: flex;
   align-items: flex-end;
