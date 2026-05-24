@@ -1865,6 +1865,7 @@ a .g-icon {
   scroll-padding: 4px;
   padding: 4px 4px 18px;
   cursor: grab;
+  touch-action: pan-x;
   scrollbar-width: thin;
   scrollbar-color: rgba(74,154,165,0.7) rgba(242,234,219,0.08);
   max-width: 100%;
@@ -2201,12 +2202,20 @@ a .g-icon {
 }
 .unlock-social-link {
   min-height: 40px;
+  padding: 0 12px;
   border-radius: var(--radius-sm);
   color: #fff;
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   transition: transform 0.2s, filter 0.2s;
+}
+.unlock-social-link .g-icon {
+  font-size: 17px;
 }
 .unlock-social-link:hover {
   transform: translateY(-2px);
@@ -3243,7 +3252,17 @@ a .g-icon {
   .share-note-grid { grid-template-columns: 1fr; }
   .note-nav-btn { width: 42px; height: 42px; }
   .notes-search-wrap { margin-bottom: 18px; }
-  .notes-track { grid-auto-columns: minmax(0, 100%); gap: 14px; }
+  .notes-track {
+    display: flex;
+    gap: 14px;
+    scroll-padding-left: 2px;
+    padding-right: 44px;
+  }
+  .notes-track > .note-card,
+  .notes-track > .community-empty {
+    flex: 0 0 86%;
+    width: 86%;
+  }
   .note-card { min-height: 320px; padding: 22px 18px; }
   .community-note-card { min-height: 0; }
   .note-card-top { gap: 10px; margin-bottom: 24px; }

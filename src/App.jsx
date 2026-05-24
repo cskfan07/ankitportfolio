@@ -1083,7 +1083,7 @@ function Notes({resources=defaultResources,userNotes=[],noteMetrics=[]}) {
     const card=track?.children?.[nextIndex];
     setActive(nextIndex);
     if(card&&track) {
-      const left=card.offsetLeft-track.offsetLeft-(track.clientWidth-card.clientWidth)/2;
+      const left=card.offsetLeft-track.offsetLeft;
       track.scrollTo({left:Math.max(0,left),behavior:"smooth"});
       window.setTimeout(updateActive,320);
     }
@@ -1095,12 +1095,12 @@ function Notes({resources=defaultResources,userNotes=[],noteMetrics=[]}) {
   const updateActive=()=>{
     const track=trackRef.current;
     if(!track) return;
-    const center=track.scrollLeft+(track.clientWidth/2);
+    const start=track.scrollLeft;
     let closest=0;
     let distance=Infinity;
     Array.from(track.children||[]).forEach((card,index)=>{
-      const cardCenter=card.offsetLeft+(card.clientWidth/2);
-      const diff=Math.abs(center-cardCenter);
+      const cardStart=card.offsetLeft-track.offsetLeft;
+      const diff=Math.abs(start-cardStart);
       if(diff<distance){distance=diff;closest=index;}
     });
     setActive(closest);
@@ -1477,6 +1477,7 @@ function Notes({resources=defaultResources,userNotes=[],noteMetrics=[]}) {
                     onClick={()=>visitContributor(link.href)}
                   >
                     <SocialIcon platform={link.platform} />
+                    <span>{link.label}</span>
                   </button>
                 ))}
               </div>
