@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 
@@ -22,21 +22,34 @@ import {
   writeBatch,
   query,
   orderBy,
+  increment,
 } from "firebase/firestore";
 
 /* eslint-disable no-unused-vars */
 
-/* ─── Icon stubs ─── */
-const User = (props) => <span {...props}>👤</span>;
-const Code2 = (props) => <span {...props}>💻</span>;
-const Award = (props) => <span {...props}>🏆</span>;
-const Briefcase = (props) => <span {...props}>💼</span>;
-const MessageCircle = (props) => <span {...props}>💬</span>;
-const Save = (props) => <span {...props}>✓</span>;
-const X = (props) => <span {...props}>×</span>;
-const Plus = (props) => <span {...props}>＋</span>;
-const Trash2 = (props) => <span {...props}>🗑</span>;
-const Pencil = (props) => <span {...props}>✎</span>;
+/* ─── Google Material icons ─── */
+const GIcon = ({name,className="",...props}) => (
+  <span className={`material-symbols-rounded g-icon ${className}`} aria-hidden="true" {...props}>{name}</span>
+);
+const User = (props) => <GIcon name="person" {...props} />;
+const Code2 = (props) => <GIcon name="code" {...props} />;
+const Award = (props) => <GIcon name="emoji_events" {...props} />;
+const Briefcase = (props) => <GIcon name="business_center" {...props} />;
+const MessageCircle = (props) => <GIcon name="chat_bubble" {...props} />;
+const Save = (props) => <GIcon name="check" {...props} />;
+const X = (props) => <GIcon name="close" {...props} />;
+const Plus = (props) => <GIcon name="add" {...props} />;
+const Trash2 = (props) => <GIcon name="delete" {...props} />;
+const Pencil = (props) => <GIcon name="edit" {...props} />;
+function SocialIcon({platform}) {
+  const icons={
+    linkedin:"badge",
+    github:"code",
+    instagram:"photo_camera",
+    email:"mail",
+  };
+  return <GIcon name={icons[platform]||"link"} />;
+}
 
 /* ─── Helpers ─── */
 /* eslint-enable no-unused-vars */
@@ -67,6 +80,10 @@ function formatDownloadUrl(url) {
   const id = getGoogleDriveFileId(url);
   return id ? `https://drive.google.com/uc?export=download&id=${id}` : formatUrl(url);
 }
+function formatResumeViewUrl(url) {
+  const id = getGoogleDriveFileId(url);
+  return id ? `https://drive.google.com/file/d/${id}/preview` : formatUrl(url);
+}
 function formatMailto(e) { const c = (e||"").trim(); return c ? `mailto:${c}` : "#"; }
 function isValidEmail(e) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test((e || "").trim());
@@ -77,15 +94,128 @@ function formatInstagramUrl(v) {
   if (/^https?:\/\//i.test(c)||/^www\./i.test(c)) return formatUrl(c);
   return `https://www.instagram.com/${c.replace(/^@/,"")}`;
 }
+function formatSocialUrl(platform,value) {
+  const c=(value||"").trim();
+  if(!c) return "";
+  if(platform==="instagram") return formatInstagramUrl(c);
+  if(/^https?:\/\//i.test(c)||/^www\./i.test(c)||/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(c)) return formatUrl(c);
+  if(platform==="linkedin") return `https://www.linkedin.com/in/${c.replace(/^@/,"")}`;
+  if(platform==="github") return `https://github.com/${c.replace(/^@/,"")}`;
+  return formatUrl(c);
+}
+function isValidSocialProfileUrl(platform,value) {
+  const c=(value||"").trim();
+  if(!c) return true;
+  if(platform==="instagram" && /^@?[A-Za-z0-9._]{1,30}$/.test(c)) return true;
+  try {
+    const url=new URL(formatUrl(c));
+    const host=url.hostname.replace(/^www\./i,"").toLowerCase();
+    const path=url.pathname.replace(/\/+$/,"");
+    if(platform==="linkedin") return host==="linkedin.com" && /^\/in\/[A-Za-z0-9_-]+/.test(path);
+    if(platform==="github") return host==="github.com" && /^\/[A-Za-z0-9-]+$/.test(path);
+    if(platform==="instagram") return host==="instagram.com" && /^\/[A-Za-z0-9._]+$/.test(path);
+    return false;
+  } catch {
+    return false;
+  }
+}
+const emailJsConfig = {
+  serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
+  templateId: import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+  publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
+  fromName: import.meta.env.VITE_EMAILJS_FROM_NAME || "Ankit Portfolio",
+};
+function hasEmailJsConfig() {
+  return Boolean(emailJsConfig.serviceId && emailJsConfig.templateId && emailJsConfig.publicKey);
+}
+function getPortfolioBaseUrl() {
+  if(typeof window==="undefined") return "";
+  const path=(window.location.pathname || "/").replace(/\/admin\/?$/,"/");
+  return `${window.location.origin}${path.endsWith("/") ? path : `${path}/`}`;
+}
+function getPortfolioNotesLink() {
+  return `${getPortfolioBaseUrl()}#notes`;
+}
+function getNoteEmailMessage(note,status,customReply="") {
+  const title=note?.title||"your submitted note";
+  const reply=customReply?.trim();
+  if(status==="approved") {
+    return {
+      subject:`Your note "${title}" was approved`,
+      message:`Your note "${title}" has been approved and is now visible on the portfolio.${reply ? `\n\nAdmin reply: ${reply}` : ""}`,
+    };
+  }
+  if(status==="rejected") {
+    return {
+      subject:`Your note "${title}" was rejected`,
+      message:`Your note "${title}" was reviewed but not approved for publishing on the portfolio.${reply ? `\n\nReason: ${reply}` : ""}`,
+    };
+  }
+  return {
+    subject:`Your note "${title}" was deleted`,
+    message:`Your submitted note "${title}" has been deleted from the review list.${reply ? `\n\nReason: ${reply}` : ""}`,
+  };
+}
+async function sendUserNoteStatusEmail(note,status,customReply="") {
+  if(!note?.email || !hasEmailJsConfig()) return {sent:false,reason:"missing-config"};
+  const email=getNoteEmailMessage(note,status,customReply);
+  const portfolioLink=getPortfolioNotesLink();
+  const response=await fetch("https://api.emailjs.com/api/v1.0/email/send",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      service_id:emailJsConfig.serviceId,
+      template_id:emailJsConfig.templateId,
+      user_id:emailJsConfig.publicKey,
+      template_params:{
+        to_name:note.name||"Learner",
+        to_email:note.email,
+        from_name:emailJsConfig.fromName,
+        note_title:note.title||"",
+        note_subject:note.subject||"",
+        note_status:status,
+        custom_reply:customReply?.trim()||"",
+        portfolio_link:portfolioLink,
+        subject:email.subject,
+        message:email.message,
+      },
+    }),
+  });
+  if(!response.ok) throw new Error(`EmailJS ${response.status}`);
+  return {sent:true};
+}
 function buildProjectSpeechText(project) {
-  const tech = project.tech ? `Technology used: ${project.tech}.` : "";
-  const experience = project.experience ? `My experience from this project: ${project.experience}.` : "";
+  const tech = project.tech ? `It was built with ${project.tech}.` : "";
+  const experience = project.experience ? `A sweet part of this project was this: ${project.experience}.` : "";
   return [
-    `Project name is ${project.title}.`,
+    `Hi, let me tell you about ${project.title}.`,
     project.description,
     tech,
     experience,
+    "Hope you liked this one.",
   ].filter(Boolean).join(" ");
+}
+function getCuteHumanVoice() {
+  if (!("speechSynthesis" in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  const preferredNames = [
+    "Google UK English Female",
+    "Google US English",
+    "Microsoft Jenny",
+    "Microsoft Aria",
+    "Microsoft Sonia",
+    "Microsoft Zira",
+    "Samantha",
+    "Karen",
+  ];
+  return (
+    preferredNames
+      .map(name => voices.find(v => v.name.toLowerCase().includes(name.toLowerCase())))
+      .find(Boolean) ||
+    voices.find(v => /female|woman|girl|natural|neural/i.test(v.name)) ||
+    voices.find(v => /^en[-_]/i.test(v.lang)) ||
+    null
+  );
 }
 function LinkifiedText({ text }) {
   const v = String(text||"");
@@ -178,7 +308,7 @@ function useTypewriter(words, speed=80, pause=1800) {
 
 /* ─── Defaults ─── */
 const defaultProfile = {
-  name:"Ankit", title:"MCA Student • Java Developer • Web Developer",
+  name:"Ankit", title:"MCA Student • Java Developer • Web Developer • Aspiring Data Analyst • Power BI & SQL Learner",
   headline:"I build clean and dynamic web projects.",
   about:"I work with Java Servlet/JSP, React, Python, Django, MySQL and MongoDB. This portfolio shows my projects, skills, certificates and development journey.",
   education:"MCA student focused on software development, web technologies and real-world projects.",
@@ -297,7 +427,40 @@ function useCollection(col,defaults) {
 }
 
 /* ─── App ─── */
+function useInspectGuard() {
+  useEffect(()=>{
+    const warn=()=>{
+      console.clear();
+      console.warn("Stop! This portfolio content is protected. Please do not copy, inspect, or misuse the work shown here.");
+    };
+    const blockContextMenu=(event)=>event.preventDefault();
+    const blockShortcuts=(event)=>{
+      const key=event.key?.toLowerCase();
+      const blocked=
+        event.key==="F12" ||
+        ((event.ctrlKey||event.metaKey) && key==="u") ||
+        ((event.ctrlKey||event.metaKey) && event.shiftKey && ["i","j","c"].includes(key));
+      if(blocked) {
+        event.preventDefault();
+        event.stopPropagation();
+        warn();
+      }
+    };
+
+    warn();
+    document.body.classList.add("inspect-guard");
+    document.addEventListener("contextmenu",blockContextMenu);
+    document.addEventListener("keydown",blockShortcuts,true);
+    return ()=>{
+      document.body.classList.remove("inspect-guard");
+      document.removeEventListener("contextmenu",blockContextMenu);
+      document.removeEventListener("keydown",blockShortcuts,true);
+    };
+  },[]);
+}
+
 export default function App() {
+  useInspectGuard();
   return (
     <BrowserRouter>
       <Routes>
@@ -319,11 +482,29 @@ function PortfolioPage() {
   const {items:projects,loading:pl}=useCollection("projects",defaultProjects);
   const {items:certs,loading:cl}=useCollection("certificates",defaultCertificates);
   const {items:resources,loading:rl}=useCollection("resources",defaultResources);
+  const {items:userNotes,loading:unl}=useCollection("userNotes",[]);
+  const {items:noteMetrics,loading:nml}=useCollection("noteMetrics",[]);
   const filtered=useMemo(()=>{
     const v=search.toLowerCase();
     return projects.filter(p=>p.title?.toLowerCase().includes(v)||p.tech?.toLowerCase().includes(v)||p.description?.toLowerCase().includes(v)||p.experience?.toLowerCase().includes(v));
   },[projects,search]);
-  if(profileLoading||sl||pl||cl||rl) return <Loader />;
+  useEffect(()=>{
+    const openNotesFromUrl=()=>{
+      try {
+        const params=new URLSearchParams(window.location.search);
+        if(window.location.hash==="#notes" || params.has("note")) {
+          setActivePage(1);
+          window.setTimeout(()=>document.getElementById("notes")?.scrollIntoView({behavior:"smooth",block:"start"}),220);
+        }
+      } catch {
+        // Ignore malformed URL state; the normal portfolio view should still load.
+      }
+    };
+    openNotesFromUrl();
+    window.addEventListener("hashchange",openNotesFromUrl);
+    return ()=>window.removeEventListener("hashchange",openNotesFromUrl);
+  },[profileLoading,sl,pl,cl,rl,unl,nml]);
+  if(profileLoading||sl||pl||cl||rl||unl||nml) return <Loader />;
   if(profile.maintenanceMode) return <MaintenancePage />;
   const goToPage=(page)=>setActivePage(Math.max(0,Math.min(page,1)));
   const startPageSwipe=(e)=>{
@@ -367,7 +548,7 @@ function PortfolioPage() {
             <Footer />
           </div>
           <div className="portfolio-slide portfolio-slide-notes">
-            <Notes resources={resources} />
+            <Notes resources={resources} userNotes={userNotes} noteMetrics={noteMetrics} />
           </div>
         </div>
       </div>
@@ -384,8 +565,9 @@ function AdminPage() {
   const {items:resources,loading:rl,fetch:fr}=useCollection("resources",defaultResources);
   const {items:msgs,loading:ml,fetch:fm}=useCollection("messages",[]);
   const {items:feedback,loading:fl,fetch:ff}=useCollection("feedback",[]);
-  if(profileLoading||sl||pl||cl||rl||ml||fl) return <Loader />;
-  return <AdminPanel projects={projects} fetchProjects={fp} certificates={certs} fetchCertificates={fc} resources={resources} fetchResources={fr} messages={msgs} fetchMessages={fm} feedback={feedback} fetchFeedback={ff} profile={profile} setProfile={setProfile} skills={skills} fetchSkills={fs} onClose={()=>navigate("/")} />;
+  const {items:userNotes,loading:unl,fetch:fun}=useCollection("userNotes",[]);
+  if(profileLoading||sl||pl||cl||rl||ml||fl||unl) return <Loader />;
+  return <AdminPanel projects={projects} fetchProjects={fp} certificates={certs} fetchCertificates={fc} resources={resources} fetchResources={fr} userNotes={userNotes} fetchUserNotes={fun} messages={msgs} fetchMessages={fm} feedback={feedback} fetchFeedback={ff} profile={profile} setProfile={setProfile} skills={skills} fetchSkills={fs} onClose={()=>navigate("/")} />;
 }
 
 /* ─── Loader ─── */
@@ -441,9 +623,14 @@ function AdminBtn({onAdmin}) {
 /* ─── HERO ─── */
 /* eslint-disable no-undef */
 function Hero({profile}) {
-  const roles = ["Java Developer","React Builder","Web Developer","MCA Student","Full-Stack Dev"];
+  const [showResume,setShowResume]=useState(false);
+  const [resumeLoading,setResumeLoading]=useState(false);
+  const roles = ["Java Developer","React Builder","Web Developer","MCA Student","Full-Stack Dev","Aspiring Data Analyst","Power BI & SQL Learner"];
   const typed = useTypewriter(roles);
   const showFeedbackModal = false;
+  const resumeHref=formatResumeViewUrl(profile.resumeUrl);
+  const resumeDownloadHref=formatDownloadUrl(profile.resumeUrl);
+  const hasResume=resumeHref!=="#";
   const stats = [
     {num:"3+",label:"Projects Built"},
     {num:"12+",label:"Skills Mastered"},
@@ -481,7 +668,7 @@ function Hero({profile}) {
           <div className="hero-actions">
             <a className="cta-primary" href="#projects">View Projects</a>
             <a className="cta-secondary" href="#contact">Contact Me</a>
-            <a className="cta-ghost" href={formatUrl(profile.resumeUrl)} target="_blank" rel="noreferrer">Resume ↗</a>
+            <button className="cta-ghost" type="button" onClick={()=>{setResumeLoading(true);setShowResume(true);}}>Resume</button>
           </div>
 
           <div className="hero-stats">
@@ -494,10 +681,10 @@ function Hero({profile}) {
           </div>
 
           <div className="hero-socials">
-            <a href={formatUrl(profile.github)} target="_blank" rel="noreferrer" className="social-pill">GitHub</a>
-            <a href={formatUrl(profile.linkedin)} target="_blank" rel="noreferrer" className="social-pill">LinkedIn</a>
-            <a href={formatMailto(profile.email)} className="social-pill">Email</a>
-            <a href={formatInstagramUrl(profile.instagram)} target="_blank" rel="noreferrer" className="social-pill">Instagram</a>
+            <a href={formatUrl(profile.github)} target="_blank" rel="noreferrer" className="social-pill github" aria-label="GitHub"><SocialIcon platform="github" /> GitHub</a>
+            <a href={formatUrl(profile.linkedin)} target="_blank" rel="noreferrer" className="social-pill linkedin" aria-label="LinkedIn"><SocialIcon platform="linkedin" /> LinkedIn</a>
+            <a href={formatMailto(profile.email)} className="social-pill email" aria-label="Email"><SocialIcon platform="email" /> Email</a>
+            <a href={formatInstagramUrl(profile.instagram)} target="_blank" rel="noreferrer" className="social-pill instagram" aria-label="Instagram"><SocialIcon platform="instagram" /> Instagram</a>
           </div>
         </div>
 
@@ -529,6 +716,31 @@ function Hero({profile}) {
         <span className="scroll-label">Scroll</span>
       </a>
     </section>
+    {showResume && (
+      <div className="resume-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="resume-modal-title" onClick={()=>setShowResume(false)}>
+        <div className="resume-modal" onClick={e=>e.stopPropagation()}>
+          <button className="resume-modal-close" type="button" onClick={()=>setShowResume(false)} aria-label="Close resume viewer">×</button>
+          <div className="resume-modal-header">
+            <div>
+              <span className="resume-modal-label">Resume</span>
+              <h2 id="resume-modal-title">Ankit's Resume</h2>
+            </div>
+            {hasResume && <a className="resume-download-btn" href={resumeDownloadHref} target="_blank" rel="noreferrer"><GIcon name="download" /> Download</a>}
+          </div>
+          <div className="resume-viewer">
+            {hasResume && resumeLoading && (
+              <div className="resume-loader">
+                <span className="resume-loader-cube" />
+                <span className="resume-loader-text">Loading resume...</span>
+              </div>
+            )}
+            {hasResume
+              ? <iframe title="Resume preview" src={resumeHref} onLoad={()=>setResumeLoading(false)} />
+              : <div className="resume-empty">Resume link is not added yet.</div>}
+          </div>
+        </div>
+      </div>
+    )}
     {showFeedbackModal && (
       <div className="rating-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="rating-modal-title">
         <div className="rating-modal">
@@ -645,6 +857,7 @@ function Skills({skills}) {
           ))}
         </div>
       </div>
+      
       <span className="bo-cube one" /><span className="bo-cube two" />
     </section>
   );
@@ -654,10 +867,25 @@ function Skills({skills}) {
 function Projects({projects,search,setSearch}) {
   const [speakingProjectId,setSpeakingProjectId]=useState("");
   const [speechStatus,setSpeechStatus]=useState("");
+  const [expandedProject,setExpandedProject]=useState({});
+  const activeSpeechRef=useRef(null);
+
+  const isProjectExpanded=(id,part)=>Boolean(expandedProject[`${id}-${part}`]);
+  const toggleProjectPart=(id,part)=>setExpandedProject(state=>({...state,[`${id}-${part}`]:!state[`${id}-${part}`]}));
 
   useEffect(()=>{
-    return ()=>window.speechSynthesis?.cancel();
+    return ()=>{
+      activeSpeechRef.current=null;
+      window.speechSynthesis?.cancel();
+    };
   },[]);
+
+  const stopProjectSpeech=()=>{
+    activeSpeechRef.current=null;
+    window.speechSynthesis.cancel();
+    setSpeakingProjectId("");
+    setSpeechStatus("");
+  };
 
   const explainProject=(project)=>{
     if(!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
@@ -665,22 +893,32 @@ function Projects({projects,search,setSearch}) {
       return;
     }
     if(speakingProjectId===project.id) {
-      window.speechSynthesis.cancel();
-      setSpeakingProjectId("");
-      setSpeechStatus("");
+      stopProjectSpeech();
       return;
     }
 
     window.speechSynthesis.cancel();
     const utterance=new window.SpeechSynthesisUtterance(buildProjectSpeechText(project));
-    utterance.lang="en-IN";
-    utterance.rate=1.12;
-    utterance.pitch=1;
-    utterance.onend=()=>setSpeakingProjectId("");
-    utterance.onerror=()=> {
-      setSpeakingProjectId("");
-      setSpeechStatus("Unable to play speech right now.");
+    const cuteVoice=getCuteHumanVoice();
+    if(cuteVoice) utterance.voice=cuteVoice;
+    utterance.lang=cuteVoice?.lang||"en-US";
+    utterance.rate=1.2;
+    utterance.pitch=1.22;
+    utterance.volume=1;
+    utterance.onend=()=> {
+      if(activeSpeechRef.current===utterance) {
+        activeSpeechRef.current=null;
+        setSpeakingProjectId("");
+      }
     };
+    utterance.onerror=()=> {
+      if(activeSpeechRef.current===utterance) {
+        activeSpeechRef.current=null;
+        setSpeakingProjectId("");
+        setSpeechStatus("Unable to play speech right now.");
+      }
+    };
+    activeSpeechRef.current=utterance;
     setSpeechStatus("");
     setSpeakingProjectId(project.id);
     window.speechSynthesis.speak(utterance);
@@ -720,11 +958,34 @@ function Projects({projects,search,setSearch}) {
                   </div>
                   <div className="project-body">
                     <h3 className="project-title">{p.title}</h3>
-                    <p className="project-desc">{p.description}</p>
-                    {p.experience && <p className="project-experience"><span>Experience</span>{p.experience}</p>}
-                    <div className="project-tech">
+                    <button
+                      type="button"
+                      className={`project-text-toggle project-desc ${isProjectExpanded(p.id,"desc")?"expanded":""}`}
+                      onClick={()=>toggleProjectPart(p.id,"desc")}
+                      aria-expanded={isProjectExpanded(p.id,"desc")}
+                    >
+                      <span className="project-field-label">Description</span>
+                      <span className="project-field-copy">{p.description}</span>
+                    </button>
+                    {p.experience && (
+                      <button
+                        type="button"
+                        className={`project-text-toggle project-experience ${isProjectExpanded(p.id,"experience")?"expanded":""}`}
+                        onClick={()=>toggleProjectPart(p.id,"experience")}
+                        aria-expanded={isProjectExpanded(p.id,"experience")}
+                      >
+                        <span className="project-field-label">Experience</span>
+                        <span className="project-field-copy">{p.experience}</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className={`project-tech ${isProjectExpanded(p.id,"tech")?"expanded":""}`}
+                      onClick={()=>toggleProjectPart(p.id,"tech")}
+                      aria-expanded={isProjectExpanded(p.id,"tech")}
+                    >
                       {String(p.tech||"").split(",").filter(Boolean).map(t=><span key={t} className="tech-badge">{t.trim()}</span>)}
-                    </div>
+                    </button>
                     <div className="project-actions">
                       <button
                         type="button"
@@ -748,26 +1009,96 @@ function Projects({projects,search,setSearch}) {
 
 /* ─── CERTIFICATES ─── */
 /* NOTES */
-function Notes({resources=defaultResources}) {
+function Notes({resources=defaultResources,userNotes=[],noteMetrics=[]}) {
   const [active,setActive]=useState(0);
+  const [noteSearch,setNoteSearch]=useState("");
+  const [showShare,setShowShare]=useState(false);
+  const [unlockNote,setUnlockNote]=useState(null);
+  const [visitedContributor,setVisitedContributor]=useState(false);
+  const [unlockWaiting,setUnlockWaiting]=useState(false);
+  const [shareStatus,setShareStatus]=useState("");
+  const [shareLoading,setShareLoading]=useState(false);
+  const [copyStatus,setCopyStatus]=useState("");
+  const [localMetrics,setLocalMetrics]=useState({});
+  const [noteForm,setNoteForm]=useState({name:"",email:"",title:"",subject:"",description:"",topics:"",fileUrl:"",linkedin:"",github:"",instagram:"",accent:"#4a9aa5",consent:false});
   const trackRef=useRef(null);
   const dragRef=useRef({down:false,startX:0,scrollLeft:0});
+  const unlockTimerRef=useRef(null);
+  const unlockAwayStartRef=useRef(null);
+  const approvedUserNotes=userNotes.filter(note=>note.status==="approved").map(note=>({
+    ...note,
+    tag:note.subject||note.tag||"Shared",
+    summary:note.description||note.summary||"",
+    href:note.fileUrl||note.href||"#",
+    accent:note.accent||"#4a9aa5",
+    contributorName:note.name,
+    contributorLinks:{
+      linkedin:note.linkedin||note.social||"",
+      github:note.github||"",
+      instagram:note.instagram||"",
+    },
+  }));
+  const noteMatchesSearch=useCallback((note)=>{
+    const normalize=(value)=>String(value||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+    const query=normalize(noteSearch);
+    if(!query) return true;
+    const topics=Array.isArray(note.topics) ? note.topics.join(" ") : String(note.topics||"");
+    const contributorLinks=note.contributorLinks ? Object.values(note.contributorLinks).join(" ") : "";
+    const haystack=normalize([
+      note.title,
+      note.tag,
+      note.subject,
+      note.summary,
+      note.description,
+      note.contributorName,
+      note.name,
+      note.email,
+      note.fileUrl,
+      note.href,
+      note.linkedin,
+      note.github,
+      note.instagram,
+      note.social,
+      contributorLinks,
+      topics,
+    ].filter(Boolean).join(" "));
+    const words=query.split(" ").filter(Boolean);
+    if(words.length<=1) return haystack.includes(query);
+    if(haystack.includes(query)) return true;
+    return words.every(word=>haystack.includes(word));
+  },[noteSearch]);
+  const filteredResources=useMemo(()=>resources.filter(noteMatchesSearch),[resources,noteMatchesSearch]);
+  const filteredUserNotes=useMemo(()=>approvedUserNotes.filter(noteMatchesSearch),[approvedUserNotes,noteMatchesSearch]);
+  const isSearchingNotes=Boolean(noteSearch.trim());
+  const showMyNotesResults=!isSearchingNotes||filteredResources.length>0;
+  const savedMetrics=useMemo(()=>noteMetrics.reduce((acc,item)=>{
+    if(item?.id) acc[item.id]={downloads:Number(item.downloads||0),shares:Number(item.shares||0)};
+    return acc;
+  },{}),[noteMetrics]);
 
   const scrollToNote=(index)=>{
-    const nextIndex=Math.max(0,Math.min(index,resources.length-1));
+    if(!filteredResources.length) return;
+    const nextIndex=Math.max(0,Math.min(index,filteredResources.length-1));
     const track=trackRef.current;
     const card=track?.children?.[nextIndex];
     setActive(nextIndex);
-    if(card) card.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
+    if(card&&track) {
+      const left=card.offsetLeft-track.offsetLeft-(track.clientWidth-card.clientWidth)/2;
+      track.scrollTo({left:Math.max(0,left),behavior:"smooth"});
+      window.setTimeout(updateActive,320);
+    }
   };
-  const moveNote=(step)=>scrollToNote((active+step+resources.length)%resources.length);
+  const moveNote=(step)=>{
+    if(!filteredResources.length) return;
+    scrollToNote((active+step+filteredResources.length)%filteredResources.length);
+  };
   const updateActive=()=>{
     const track=trackRef.current;
     if(!track) return;
     const center=track.scrollLeft+(track.clientWidth/2);
     let closest=0;
     let distance=Infinity;
-    Array.from(track.children).forEach((card,index)=>{
+    Array.from(track.children||[]).forEach((card,index)=>{
       const cardCenter=card.offsetLeft+(card.clientWidth/2);
       const diff=Math.abs(center-cardCenter);
       if(diff<distance){distance=diff;closest=index;}
@@ -792,6 +1123,175 @@ function Notes({resources=defaultResources}) {
     track.classList.remove("is-dragging");
     updateActive();
   };
+  const setNoteField=(field,value)=>setNoteForm(form=>({...form,[field]:value}));
+  const getMetricId=(kind,note)=>`${kind}-${note?.id||note?.title||"unknown"}`;
+  const getNoteMetrics=(kind,note)=>{
+    const id=getMetricId(kind,note);
+    const saved=savedMetrics[id]||{};
+    const local=localMetrics[id]||{};
+    return {
+      downloads:Number(saved.downloads||0)+Number(local.downloads||0),
+      shares:Number(saved.shares||0)+Number(local.shares||0),
+    };
+  };
+  const bumpNoteMetric=async(kind,note,field)=>{
+    const id=getMetricId(kind,note);
+    setLocalMetrics(metrics=>({
+      ...metrics,
+      [id]:{
+        downloads:Number(metrics[id]?.downloads||0)+(field==="downloads"?1:0),
+        shares:Number(metrics[id]?.shares||0)+(field==="shares"?1:0),
+      },
+    }));
+    try {
+      await setDoc(doc(db,"noteMetrics",id),{
+        noteId:String(note.id||note.title),
+        noteTitle:note.title||"",
+        noteKind:kind,
+        [field]:increment(1),
+        createdAt:serverTimestamp(),
+        updatedAt:serverTimestamp(),
+      },{merge:true});
+    } catch (error) {
+      console.warn("Failed to update note metric", error);
+    }
+  };
+  const copyNoteLink=async(kind,note)=>{
+    const id=getMetricId(kind,note);
+    const link=`${getPortfolioBaseUrl()}?note=${encodeURIComponent(id)}#notes`;
+    try {
+      if(navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        const field=document.createElement("textarea");
+        field.value=link;
+        field.style.position="fixed";
+        field.style.opacity="0";
+        document.body.appendChild(field);
+        field.select();
+        document.execCommand("copy");
+        document.body.removeChild(field);
+      }
+      await bumpNoteMetric(kind,note,"shares");
+      setCopyStatus(`Share link copied for ${note.title}.`);
+      setTimeout(()=>setCopyStatus(""),2600);
+    } catch {
+      setCopyStatus("Unable to copy link right now.");
+      setTimeout(()=>setCopyStatus(""),2600);
+    }
+  };
+  const downloadNote=(kind,note)=>{
+    bumpNoteMetric(kind,note,"downloads");
+    window.open(formatDownloadUrl(note.href),"_blank","noopener,noreferrer");
+  };
+  const clearUnlockTimer=()=>{
+    if(unlockTimerRef.current) {
+      clearInterval(unlockTimerRef.current);
+      unlockTimerRef.current=null;
+    }
+    unlockAwayStartRef.current=null;
+    setUnlockWaiting(false);
+  };
+  const openUnlockModal=(note)=>{
+    clearUnlockTimer();
+    setUnlockNote(note);
+    setVisitedContributor(false);
+  };
+  const closeUnlockModal=()=>{
+    clearUnlockTimer();
+    setUnlockNote(null);
+    setVisitedContributor(false);
+  };
+  const visitContributor=(url)=>{
+    clearUnlockTimer();
+    setVisitedContributor(false);
+    setUnlockWaiting(true);
+    window.open(formatUrl(url),"_blank","noopener,noreferrer");
+    unlockTimerRef.current=setInterval(()=>{
+      const isAwayFromPortfolio=document.hidden||!document.hasFocus();
+      if(!isAwayFromPortfolio) {
+        unlockAwayStartRef.current=null;
+        return;
+      }
+      if(!unlockAwayStartRef.current) unlockAwayStartRef.current=Date.now();
+      if(Date.now()-unlockAwayStartRef.current>=5000) {
+        setVisitedContributor(true);
+        setUnlockWaiting(false);
+        clearInterval(unlockTimerRef.current);
+        unlockTimerRef.current=null;
+        unlockAwayStartRef.current=null;
+      }
+    },250);
+  };
+  const downloadUnlockedNote=()=>{
+    if(!unlockNote) return;
+    downloadNote("user",unlockNote);
+    closeUnlockModal();
+  };
+  useEffect(()=>()=> {
+    if(unlockTimerRef.current) clearInterval(unlockTimerRef.current);
+  },[]);
+  const submitUserNote=async()=>{
+    if(!noteForm.name.trim()||!noteForm.email.trim()||!noteForm.title.trim()||!noteForm.subject.trim()||!noteForm.description.trim()||!noteForm.fileUrl.trim()){
+      setShareStatus("Please fill all required fields.");
+      return;
+    }
+    if(!noteForm.consent){
+      setShareStatus("Please confirm that these notes are yours or you have permission to share them.");
+      return;
+    }
+    if(!isValidEmail(noteForm.email)){setShareStatus("Please enter a valid email.");return;}
+    if(!isValidSocialProfileUrl("linkedin",noteForm.linkedin)){
+      setShareStatus("Please enter a real LinkedIn profile URL, like https://www.linkedin.com/in/username.");
+      return;
+    }
+    if(!isValidSocialProfileUrl("github",noteForm.github)){
+      setShareStatus("Please enter a real GitHub profile URL, like https://github.com/username.");
+      return;
+    }
+    if(!isValidSocialProfileUrl("instagram",noteForm.instagram)){
+      setShareStatus("Please enter a real Instagram profile URL, like https://www.instagram.com/username.");
+      return;
+    }
+    try {
+      setShareLoading(true); setShareStatus("");
+      await addDoc(collection(db,"userNotes"),{
+        name:noteForm.name.trim(),
+        email:noteForm.email.trim(),
+        title:noteForm.title.trim(),
+        subject:noteForm.subject.trim(),
+        description:noteForm.description.trim(),
+        topics:String(noteForm.topics||"").split(",").map(topic=>topic.trim()).filter(Boolean),
+        fileUrl:formatUrl(noteForm.fileUrl),
+        linkedin:formatSocialUrl("linkedin",noteForm.linkedin),
+        github:formatSocialUrl("github",noteForm.github),
+        instagram:formatSocialUrl("instagram",noteForm.instagram),
+        accent:noteForm.accent||"#4a9aa5",
+        consent:true,
+        status:"pending",
+        createdAt:serverTimestamp(),
+        updatedAt:serverTimestamp(),
+      });
+      setNoteForm({name:"",email:"",title:"",subject:"",description:"",topics:"",fileUrl:"",linkedin:"",github:"",instagram:"",accent:"#4a9aa5",consent:false});
+      setShareStatus("Thanks! Your note was submitted for review.");
+    } catch (error) {
+      const code=error?.code||"unknown error";
+      setShareStatus(code==="permission-denied" ? "Firestore rules blocked this note submission." : `Failed to submit note: ${code}`);
+    } finally {
+      setShareLoading(false);
+      setTimeout(()=>setShareStatus(""),4200);
+    }
+  };
+  const unlockContributorLinks=unlockNote ? [
+    {label:"LinkedIn",platform:"linkedin",className:"linkedin",href:unlockNote.contributorLinks?.linkedin},
+    {label:"GitHub",platform:"github",className:"github",href:unlockNote.contributorLinks?.github},
+    {label:"Instagram",platform:"instagram",className:"instagram",href:unlockNote.contributorLinks?.instagram},
+  ].filter(link=>link.href) : [];
+  const canDownloadUnlockedNote=!unlockContributorLinks.length||visitedContributor;
+  const updateNoteSearch=(value)=>{
+    setNoteSearch(value);
+    setActive(0);
+  };
 
   return (
     <section id="notes" className="section notes-section">
@@ -803,53 +1303,195 @@ function Notes({resources=defaultResources}) {
             <p className="section-subtitle reveal-target">Swipe through my notes for AI/ML, Java, Power BI, STQA and web development.</p>
           </div>
           <div className="notes-controls reveal-target" aria-label="Notes carousel controls">
+            <button type="button" className="share-note-btn" onClick={()=>setShowShare(v=>!v)}><GIcon name="upload_file" /> Contribute Notes</button>
             <button type="button" className="note-nav-btn" onClick={()=>moveNote(-1)} aria-label="Previous note">&lsaquo;</button>
             <button type="button" className="note-nav-btn" onClick={()=>moveNote(1)} aria-label="Next note">&rsaquo;</button>
           </div>
         </div>
+        {showShare && (
+          <div className="share-note-panel reveal-target">
+            <div className="share-note-copy">
+              <h3>Contribute Notes</h3>
+              <p>Share a PDF, DOC, or Drive link. Approved notes show your name as credit.</p>
+            </div>
+            <div className="share-note-grid">
+              <input value={noteForm.name} onChange={e=>setNoteField("name",e.target.value)} placeholder="Your name" className="share-note-input" />
+              <input value={noteForm.email} onChange={e=>setNoteField("email",e.target.value)} placeholder="Your email" className="share-note-input" />
+              <input value={noteForm.title} onChange={e=>setNoteField("title",e.target.value)} placeholder="Note title" className="share-note-input" />
+              <input value={noteForm.subject} onChange={e=>setNoteField("subject",e.target.value)} placeholder="Subject / category" className="share-note-input" />
+              <label className="share-note-color">
+                <span>Card color</span>
+                <input type="color" value={noteForm.accent} onChange={e=>setNoteField("accent",e.target.value)} />
+              </label>
+              <input value={noteForm.fileUrl} onChange={e=>setNoteField("fileUrl",e.target.value)} placeholder="PDF / DOC / Google Drive link" className="share-note-input wide" />
+              <input value={noteForm.linkedin} onChange={e=>setNoteField("linkedin",e.target.value)} placeholder="LinkedIn profile URL (optional)" className="share-note-input" />
+              <input value={noteForm.github} onChange={e=>setNoteField("github",e.target.value)} placeholder="GitHub profile URL (optional)" className="share-note-input" />
+              <input value={noteForm.instagram} onChange={e=>setNoteField("instagram",e.target.value)} placeholder="Instagram username or URL (optional)" className="share-note-input wide" />
+              <input value={noteForm.topics} onChange={e=>setNoteField("topics",e.target.value)} placeholder="Topics separated by commas" className="share-note-input wide" />
+              <textarea value={noteForm.description} onChange={e=>setNoteField("description",e.target.value)} placeholder="Short description" className="share-note-input share-note-textarea wide" />
+              <label className="share-note-consent wide">
+                <input type="checkbox" checked={noteForm.consent} onChange={e=>setNoteField("consent",e.target.checked)} />
+                <span>I confirm these notes are mine or I have permission to share them.</span>
+              </label>
+            </div>
+            <button className="share-note-submit" onClick={submitUserNote} disabled={shareLoading}><GIcon name="send" /> {shareLoading?"Submitting...":"Submit for Review"}</button>
+            {shareStatus && <p className={`share-note-status ${shareStatus.startsWith("Thanks")?"success":"error"}`}>{shareStatus}</p>}
+          </div>
+        )}
+        {copyStatus && <p className="note-copy-status reveal-target">{copyStatus}</p>}
 
-        <div
-          ref={trackRef}
-          className="notes-track reveal-target"
-          onScroll={updateActive}
-          onMouseDown={e=>startDrag(e.clientX)}
-          onMouseMove={e=>dragMove(e.clientX)}
-          onMouseUp={endDrag}
-          onMouseLeave={endDrag}
-          onTouchStart={e=>startDrag(e.touches[0].clientX)}
-          onTouchMove={e=>dragMove(e.touches[0].clientX)}
-          onTouchEnd={endDrag}
-        >
-          {resources.map((note,index)=>{
-            const topics=Array.isArray(note.topics) ? note.topics : String(note.topics||"").split(",").map(topic=>topic.trim()).filter(Boolean);
-            return (
-            <article key={note.title} className="note-card" style={{"--note-accent":note.accent,"--delay":`${index*90}ms`}}>
-              <div className="note-card-top">
-                <span className="note-index">{String(index+1).padStart(2,"0")}</span>
-                <span className="note-tag">{note.tag}</span>
-              </div>
-              <h3 className="note-title">{note.title}</h3>
-              <p className="note-summary">{note.summary}</p>
-              <div className="note-topic-list">
-                {topics.map(topic=><span key={topic}>{topic}</span>)}
-              </div>
-              <a className="note-link" href={formatDownloadUrl(note.href)} target="_blank" rel="noreferrer" download>Download Notes</a>
-            </article>
-          )})}
+        <div className="search-wrap notes-search-wrap reveal-target">
+          <span className="search-icon"><GIcon name="search" /></span>
+          <input value={noteSearch} onChange={e=>updateNoteSearch(e.target.value)} placeholder="Search notes by title, topic, subject, or contributor..." className="search-input notes-search-input" />
+          {noteSearch && <button className="search-clear notes-search-clear" onClick={()=>updateNoteSearch("")} aria-label="Clear notes search">×</button>}
         </div>
 
-        <div className="notes-dots reveal-target" aria-label="Choose note">
-          {resources.map((note,index)=>(
-            <button
-              key={note.title}
-              type="button"
-              className={index===active?"active":""}
-              onClick={()=>scrollToNote(index)}
-              aria-label={`Show ${note.title}`}
-            />
-          ))}
+        {showMyNotesResults && (
+          <>
+            <div
+              ref={trackRef}
+              className="notes-track reveal-target"
+              onScroll={updateActive}
+              onMouseDown={e=>startDrag(e.clientX)}
+              onMouseMove={e=>dragMove(e.clientX)}
+              onMouseUp={endDrag}
+              onMouseLeave={endDrag}
+              onTouchStart={e=>startDrag(e.touches[0].clientX)}
+              onTouchMove={e=>dragMove(e.touches[0].clientX)}
+              onTouchEnd={endDrag}
+            >
+              {filteredResources.length===0 ? (
+                <div className="community-empty notes-empty-search">No notes match your search.</div>
+              ) : filteredResources.map((note,index)=>{
+                const topics=Array.isArray(note.topics) ? note.topics : String(note.topics||"").split(",").map(topic=>topic.trim()).filter(Boolean);
+                const metrics=getNoteMetrics("resource",note);
+                return (
+                <article key={note.title} className="note-card" style={{"--note-accent":note.accent,"--delay":`${index*90}ms`}}>
+                  <div className="note-card-top">
+                    <span className="note-index">{String(index+1).padStart(2,"0")}</span>
+                    <span className="note-tag">{note.tag}</span>
+                  </div>
+                  <h3 className="note-title">{note.title}</h3>
+                  <p className="note-summary">{note.summary}</p>
+                  {note.contributorName && (
+                    <div className="note-contributor">
+                      <span>Shared by {note.contributorName}</span>
+                      <div className="note-socials" aria-label={`${note.contributorName} social links`}>
+                        {note.contributorLinks?.linkedin && <a className="note-social-link linkedin" href={formatUrl(note.contributorLinks.linkedin)} target="_blank" rel="noreferrer" aria-label="LinkedIn"><SocialIcon platform="linkedin" /></a>}
+                        {note.contributorLinks?.github && <a className="note-social-link github" href={formatUrl(note.contributorLinks.github)} target="_blank" rel="noreferrer" aria-label="GitHub"><SocialIcon platform="github" /></a>}
+                        {note.contributorLinks?.instagram && <a className="note-social-link instagram" href={formatUrl(note.contributorLinks.instagram)} target="_blank" rel="noreferrer" aria-label="Instagram"><SocialIcon platform="instagram" /></a>}
+                      </div>
+                    </div>
+                  )}
+                  <div className="note-topic-list">
+                    {topics.map(topic=><span key={topic}>{topic}</span>)}
+                  </div>
+                  <div className="note-action-row">
+                    <button className="note-link" type="button" onClick={()=>downloadNote("resource",note)}><GIcon name="download" /> Download Notes <span className="note-action-count">{metrics.downloads}</span></button>
+                    <button className="note-link note-share-link" type="button" onClick={()=>copyNoteLink("resource",note)}><GIcon name="share" /> Copy Link</button>
+                  </div>
+                </article>
+              )})}
+            </div>
+
+            <div className="notes-dots reveal-target" aria-label="Choose note">
+              {filteredResources.map((note,index)=>(
+                <button
+                  key={note.title}
+                  type="button"
+                  className={index===active?"active":""}
+                  onClick={()=>scrollToNote(index)}
+                  aria-label={`Show ${note.title}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="community-notes reveal-target">
+          <div className="community-notes-header">
+            <div>
+              <div className="section-label">Community Notes</div>
+              <h3 className="community-notes-title">{isSearchingNotes && !filteredResources.length ? "Community Results" : "Notes Shared by Users"}</h3>
+              <p className="community-notes-subtitle">{isSearchingNotes && !filteredResources.length ? "No matching personal notes found, showing approved community notes." : "Approved contributions from other learners, with credit links."}</p>
+            </div>
+          </div>
+          {filteredUserNotes.length===0 ? (
+            <div className="community-empty">{noteSearch ? "No community notes match your search." : "No user notes approved yet."}</div>
+          ) : (
+            <div className="community-notes-grid">
+              {filteredUserNotes.map((note,index)=>{
+                const topics=Array.isArray(note.topics) ? note.topics : String(note.topics||"").split(",").map(topic=>topic.trim()).filter(Boolean);
+                const metrics=getNoteMetrics("user",note);
+                return (
+                  <article key={note.id||note.title} className="note-card community-note-card" style={{"--note-accent":note.accent,"--delay":`${index*90}ms`}}>
+                    <div className="note-card-top">
+                      <span className="note-index">{String(index+1).padStart(2,"0")}</span>
+                      <span className="note-tag">{note.tag}</span>
+                    </div>
+                    <h3 className="note-title">{note.title}</h3>
+                    <p className="note-summary">{note.summary}</p>
+                    {note.contributorName && (
+                      <div className="note-contributor">
+                        <span>Shared by {note.contributorName}</span>
+                        <div className="note-socials" aria-label={`${note.contributorName} social links`}>
+                          {note.contributorLinks?.linkedin && <a className="note-social-link linkedin" href={formatUrl(note.contributorLinks.linkedin)} target="_blank" rel="noreferrer" aria-label="LinkedIn"><SocialIcon platform="linkedin" /></a>}
+                          {note.contributorLinks?.github && <a className="note-social-link github" href={formatUrl(note.contributorLinks.github)} target="_blank" rel="noreferrer" aria-label="GitHub"><SocialIcon platform="github" /></a>}
+                          {note.contributorLinks?.instagram && <a className="note-social-link instagram" href={formatUrl(note.contributorLinks.instagram)} target="_blank" rel="noreferrer" aria-label="Instagram"><SocialIcon platform="instagram" /></a>}
+                        </div>
+                      </div>
+                    )}
+                    <div className="note-topic-list">
+                      {topics.map(topic=><span key={topic}>{topic}</span>)}
+                    </div>
+                    <div className="note-action-row">
+                      <button className="note-link" type="button" onClick={()=>openUnlockModal(note)}><GIcon name="lock_open" /> Unlock Download <span className="note-action-count">{metrics.downloads}</span></button>
+                      <button className="note-link note-share-link" type="button" onClick={()=>copyNoteLink("user",note)}><GIcon name="share" /> Copy Link</button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
+      {unlockNote && (
+        <div className="unlock-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="unlock-modal-title" onClick={closeUnlockModal}>
+          <div className="unlock-modal" onClick={e=>e.stopPropagation()}>
+            <button className="unlock-modal-close" type="button" onClick={closeUnlockModal} aria-label="Close download unlock">×</button>
+            <div className="section-label unlock-modal-label">Download Unlock</div>
+            <h3 id="unlock-modal-title" className="unlock-modal-title">{unlockNote.title}</h3>
+            <p className="unlock-modal-copy">
+              {unlockContributorLinks.length
+                ? `Visit ${unlockNote.contributorName || "the contributor"}'s profile once to unlock this download.`
+                : "This note has no contributor profile attached, so the download is ready."}
+            </p>
+            {unlockContributorLinks.length > 0 && (
+              <div className="unlock-socials">
+                {unlockContributorLinks.map(link=>(
+                  <button
+                    key={link.label}
+                    type="button"
+                    className={`unlock-social-link ${link.className}`}
+                    aria-label={link.label}
+                    onClick={()=>visitContributor(link.href)}
+                  >
+                    <SocialIcon platform={link.platform} />
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              className="unlock-download-btn"
+              onClick={downloadUnlockedNote}
+              disabled={!canDownloadUnlockedNote}
+            >
+              {canDownloadUnlockedNote ? <><GIcon name="download" /> Download Notes</> : unlockWaiting ? "Keep profile open for 5 seconds..." : <><GIcon name="open_in_new" /> Visit profile to unlock</>}
+            </button>
+          </div>
+        </div>
+      )}
       <span className="bo-cube one" /><span className="bo-cube two" />
     </section>
   );
@@ -937,8 +1579,28 @@ function Contact({profile}) {
   const setFeedbackField=(f,v)=>setFeedback(p=>({...p,[f]:v}));
   useEffect(()=>{
     if(sessionStorage.getItem("portfolioFeedbackClosed")==="true"||localStorage.getItem("portfolioFeedbackSent")==="true") return;
-    const timer=setTimeout(()=>setShowFeedbackModal(true),20000);
-    return ()=>clearTimeout(timer);
+    let timer=null;
+    const showWhenReady=()=>{
+      if(timer) return;
+      timer=setTimeout(()=>setShowFeedbackModal(true),1200);
+    };
+    const handleScroll=()=>{
+      const scrollTop=window.scrollY||document.documentElement.scrollTop;
+      const maxScroll=document.documentElement.scrollHeight-window.innerHeight;
+      const progress=maxScroll>0 ? scrollTop/maxScroll : 0;
+      const contact=document.getElementById("contact");
+      const contactTop=contact?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+      if(progress>=0.7 || contactTop<window.innerHeight*0.75) {
+        showWhenReady();
+        window.removeEventListener("scroll",handleScroll);
+      }
+    };
+    window.addEventListener("scroll",handleScroll,{passive:true});
+    handleScroll();
+    return ()=>{
+      window.removeEventListener("scroll",handleScroll);
+      if(timer) clearTimeout(timer);
+    };
   },[]);
   const closeFeedbackModal=()=>{
     sessionStorage.setItem("portfolioFeedbackClosed","true");
@@ -977,10 +1639,10 @@ function Contact({profile}) {
     }
   };
   const links=[
-    {label:"LinkedIn",href:formatUrl(profile.linkedin)},
-    {label:"GitHub",href:formatUrl(profile.github)},
-    {label:"Instagram",href:formatInstagramUrl(profile.instagram)},
-    {label:"Email",href:formatMailto(profile.email)},
+    {label:"LinkedIn",platform:"linkedin",href:formatUrl(profile.linkedin)},
+    {label:"GitHub",platform:"github",href:formatUrl(profile.github)},
+    {label:"Instagram",platform:"instagram",href:formatInstagramUrl(profile.instagram)},
+    {label:"Email",platform:"email",href:formatMailto(profile.email)},
   ];
   return (
     <>
@@ -1015,7 +1677,7 @@ function Contact({profile}) {
               <h3 className="info-card-title">Find me on</h3>
               <div className="contact-links">
                 {links.map(l=>(
-                  <a key={l.label} href={l.href} target={l.href.startsWith("mailto")?"_self":"_blank"} rel="noreferrer" className="contact-link-btn">{l.label} ↗</a>
+                  <a key={l.label} href={l.href} target={l.href.startsWith("mailto")?"_self":"_blank"} rel="noreferrer" className={`contact-link-btn ${l.platform}`} aria-label={l.label}><SocialIcon platform={l.platform} /> {l.label}</a>
                 ))}
               </div>
             </div>
@@ -1090,7 +1752,7 @@ function Footer() {
 /* ════════════════════════════════════════
    ADMIN PANEL (unchanged logic, new theme)
    ════════════════════════════════════════ */
-function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resources,fetchResources,messages,fetchMessages,feedback,fetchFeedback,profile,setProfile,skills,fetchSkills,onClose}) {
+function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resources,fetchResources,userNotes,fetchUserNotes,messages,fetchMessages,feedback,fetchFeedback,profile,setProfile,skills,fetchSkills,onClose}) {
   const emptyProject={title:"",description:"",experience:"",tech:"",github:"",demo:"",image:""};
   const emptyCert={title:"",provider:"",date:"",experience:"",imageUrl:"",credentialUrl:""};
   const emptyResource={title:"",tag:"",summary:"",topics:"",accent:"#4a9aa5",href:""};
@@ -1123,7 +1785,7 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resou
   const [feedbackAdminStatus,setFeedbackAdminStatus]=useState("");
   const [tab,setTab]=useState("profile");
 
-  const tabs=[{id:"profile",label:"Profile",icon:"👤"},{id:"skills",label:"Skills",icon:"💻"},{id:"projects",label:"Projects",icon:"💼"},{id:"resources",label:"Resources",icon:"📚"},{id:"certificates",label:"Certificates",icon:"🏆"},{id:"messages",label:"Messages",icon:"💬"},{id:"feedback",label:"Feedback",icon:"★"}];
+  const tabs=[{id:"profile",label:"Profile",icon:"👤"},{id:"skills",label:"Skills",icon:"💻"},{id:"projects",label:"Projects",icon:"💼"},{id:"resources",label:"Resources",icon:"📚"},{id:"userNotes",label:"User Notes",icon:"📝"},{id:"certificates",label:"Certificates",icon:"🏆"},{id:"messages",label:"Messages",icon:"💬"},{id:"feedback",label:"Feedback",icon:"★"}];
 
   useEffect(()=>{
     const unsub=onAuthStateChanged(auth,u=>{setIsLoggedIn(!!u);setAuthLoading(false);});
@@ -1255,6 +1917,51 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resou
     if(String(id).startsWith("dr")){flash(setResourceMsg,"Cannot delete default resources.");return;}
     try{await deleteDoc(doc(db,"resources",id));await fetchResources();flash(setResourceMsg,"✓ Deleted.");}catch{flash(setResourceMsg,"✗ Failed.");}
   };
+  const setUserNoteStatus=async(id,status)=>{
+    try{
+      const note=userNotes.find(item=>item.id===id);
+      if((note?.status||"pending")===status) {
+        flash(setResourceMsg,`This note is already ${status}. Email not sent again.`);
+        return;
+      }
+      const customReply=window.prompt(
+        status==="approved"
+          ? "Optional reply for approval email:"
+          : "Reason for rejection email:",
+        ""
+      );
+      if(customReply===null) return;
+      await updateDoc(doc(db,"userNotes",id),{status,updatedAt:serverTimestamp()});
+      await fetchUserNotes();
+      let emailText="";
+      try {
+        const emailResult=await sendUserNoteStatusEmail(note,status,customReply);
+        emailText=emailResult.sent ? " Email sent." : " EmailJS not configured.";
+      } catch {
+        emailText=" Email failed.";
+      }
+      flash(setResourceMsg,`${status==="approved"?"✓ Note approved.":"✓ Note rejected."}${emailText}`);
+    }catch{flash(setResourceMsg,"✗ Failed to update note.");}
+  };
+  const deleteUserNote=async(id)=>{
+    if(!window.confirm("Delete this submitted note?")) return;
+    try{
+      const note=userNotes.find(item=>item.id===id);
+      const customReply=window.prompt("Reason for delete email:", "");
+      if(customReply===null) return;
+      await deleteDoc(doc(db,"userNotes",id));
+      await fetchUserNotes();
+      let emailText="";
+      try {
+        const emailResult=await sendUserNoteStatusEmail(note,"deleted",customReply);
+        emailText=emailResult.sent ? " Email sent." : " EmailJS not configured.";
+      } catch {
+        emailText=" Email failed.";
+      }
+      flash(setResourceMsg,`✓ User note deleted.${emailText}`);
+    }
+    catch{flash(setResourceMsg,"✗ Failed to delete note.");}
+  };
 
   const markRead=async(id)=>{try{await updateDoc(doc(db,"messages",id),{status:"read",updatedAt:serverTimestamp()});await fetchMessages();flash(setMsgStatus,"✓ Marked as read.");}catch{flash(setMsgStatus,"✗ Failed.");}};
   const deleteMsg=async(id)=>{if(!window.confirm("Delete message?")) return;try{await deleteDoc(doc(db,"messages",id));await fetchMessages();flash(setMsgStatus,"✓ Deleted.");}catch{flash(setMsgStatus,"✗ Failed.");}};
@@ -1364,8 +2071,8 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resou
                   <div className="item-actions">
                     <button className="item-move" disabled={i===0} onClick={()=>reorderItems("skills",skills,i,-1,fetchSkills,setSkillMsg,"skills",defaultSkills.map(item=>item.id))}>Up</button>
                     <button className="item-move" disabled={i===skills.length-1} onClick={()=>reorderItems("skills",skills,i,1,fetchSkills,setSkillMsg,"skills",defaultSkills.map(item=>item.id))}>Down</button>
-                    <button className="item-edit" onClick={()=>{setEditingSkillId(s.id);setSkillForm({name:s.name,category:s.category});}}>Edit</button>
-                    <button className="item-delete" onClick={()=>deleteSkill(s.id)}>Delete</button>
+                    <button className="item-edit" onClick={()=>{setEditingSkillId(s.id);setSkillForm({name:s.name,category:s.category});}}><Pencil /> Edit</button>
+                    <button className="item-delete" onClick={()=>deleteSkill(s.id)}><Trash2 /> Delete</button>
                   </div>
                 </div>
               ))}
@@ -1452,6 +2159,44 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resou
           </>
         )}
 
+        {/* user notes */}
+        {tab==="userNotes" && (
+          <div className="admin-panel-box">
+            <div className="panel-footer" style={{marginBottom:"16px"}}>
+              <h3 className="panel-title" style={{margin:0}}>Submitted User Notes</h3>
+              <button className="panel-cancel-btn" onClick={fetchUserNotes}><GIcon name="refresh" /> Refresh</button>
+              {resourceMsg && <span className="panel-msg">{resourceMsg}</span>}
+            </div>
+            {userNotes.length===0
+              ? <p style={{color:"#324152",padding:"20px"}}>No user notes submitted yet.</p>
+              : <div className="msg-grid">
+                  {userNotes.map(note=>(
+                    <div key={note.id} className="msg-card">
+                      <div className="msg-header">
+                        <div>
+                          <div className="msg-name">{note.title}</div>
+                          <a href={formatMailto(note.email)} className="msg-email">{note.name} • {note.email}</a>
+                        </div>
+                        <span className={`msg-badge ${note.status==="approved"?"read":"new"}`}>{note.status||"pending"}</span>
+                      </div>
+                      <p className="msg-text">{note.description}</p>
+                      <p className="msg-date">{note.subject} • {(Array.isArray(note.topics)?note.topics.join(", "):note.topics)||"No topics"}</p>
+                      <div className="item-actions">
+                        <a href={formatUrl(note.fileUrl)} target="_blank" rel="noreferrer" className="item-edit" style={{textDecoration:"none",display:"inline-flex",alignItems:"center"}}><GIcon name="open_in_new" /> Open File</a>
+                        {(note.linkedin||note.social) && <a href={formatUrl(note.linkedin||note.social)} target="_blank" rel="noreferrer" className="item-edit" style={{textDecoration:"none",display:"inline-flex",alignItems:"center"}} aria-label="LinkedIn"><SocialIcon platform="linkedin" /></a>}
+                        {note.github && <a href={formatUrl(note.github)} target="_blank" rel="noreferrer" className="item-edit" style={{textDecoration:"none",display:"inline-flex",alignItems:"center"}} aria-label="GitHub"><SocialIcon platform="github" /></a>}
+                        {note.instagram && <a href={formatInstagramUrl(note.instagram)} target="_blank" rel="noreferrer" className="item-edit" style={{textDecoration:"none",display:"inline-flex",alignItems:"center"}} aria-label="Instagram"><SocialIcon platform="instagram" /></a>}
+                        <button className="item-edit" disabled={note.status==="approved"} onClick={()=>setUserNoteStatus(note.id,"approved")}>Approve</button>
+                        <button className="item-move" disabled={note.status==="rejected"} onClick={()=>setUserNoteStatus(note.id,"rejected")}>Reject</button>
+                        <button className="item-delete" onClick={()=>deleteUserNote(note.id)}><Trash2 /> Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+            }
+          </div>
+        )}
+
         {/* certificates */}
         {tab==="certificates" && (
           <>
@@ -1494,7 +2239,7 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resou
           <div className="admin-panel-box">
             <div className="panel-footer" style={{marginBottom:"16px"}}>
               <h3 className="panel-title" style={{margin:0}}>Contact Messages</h3>
-              <button className="panel-cancel-btn" onClick={fetchMessages}>Refresh</button>
+              <button className="panel-cancel-btn" onClick={fetchMessages}><GIcon name="refresh" /> Refresh</button>
               {msgStatus && <span className="panel-msg">{msgStatus}</span>}
             </div>
             {messages.length===0
@@ -1514,7 +2259,7 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resou
                       <div className="item-actions">
                         <button className="item-edit" onClick={()=>markRead(m.id)}>Mark Read</button>
                         <a href={formatMailto(m.email)} className="item-edit" style={{textDecoration:"none",display:"inline-flex",alignItems:"center"}}>Reply</a>
-                        <button className="item-delete" onClick={()=>deleteMsg(m.id)}>Delete</button>
+                        <button className="item-delete" onClick={()=>deleteMsg(m.id)}><Trash2 /> Delete</button>
                       </div>
                     </div>
                   ))}
@@ -1529,7 +2274,7 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resou
             <div className="panel-footer" style={{marginBottom:"16px"}}>
               <h3 className="panel-title" style={{margin:0}}>Page Feedback</h3>
               <span className="feedback-summary">Average {avgRating}/5 from {feedback.length} rating{feedback.length===1?"":"s"}</span>
-              <button className="panel-cancel-btn" onClick={fetchFeedback}>Refresh</button>
+              <button className="panel-cancel-btn" onClick={fetchFeedback}><GIcon name="refresh" /> Refresh</button>
               {feedbackAdminStatus && <span className="panel-msg">{feedbackAdminStatus}</span>}
             </div>
             {feedback.length===0
@@ -1550,7 +2295,7 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resou
                       <div className="item-actions">
                         <button className="item-edit" onClick={()=>markFeedbackRead(item.id)}>Mark Read</button>
                         {item.email && <a href={formatMailto(item.email)} className="item-edit" style={{textDecoration:"none",display:"inline-flex",alignItems:"center"}}>Reply</a>}
-                        <button className="item-delete" onClick={()=>deleteFeedback(item.id)}>Delete</button>
+                        <button className="item-delete" onClick={()=>deleteFeedback(item.id)}><Trash2 /> Delete</button>
                       </div>
                     </div>
                   ))}
