@@ -1865,7 +1865,7 @@ a .g-icon {
   scroll-padding: 4px;
   padding: 4px 4px 18px;
   cursor: grab;
-  touch-action: pan-x;
+  touch-action: pan-y;
   scrollbar-width: thin;
   scrollbar-color: rgba(74,154,165,0.7) rgba(242,234,219,0.08);
   max-width: 100%;
@@ -3256,24 +3256,25 @@ a .g-icon {
     display: flex;
     gap: 14px;
     scroll-padding-left: 2px;
-    padding-right: 44px;
+    padding-right: 60px;
   }
   .notes-track > .note-card,
   .notes-track > .community-empty {
-    flex: 0 0 86%;
-    width: 86%;
+    flex: 0 0 78%;
+    width: 78%;
   }
-  .note-card { min-height: 320px; padding: 22px 18px; }
+  .note-card { min-height: 286px; padding: 18px 15px; }
   .community-note-card { min-height: 0; }
-  .note-card-top { gap: 10px; margin-bottom: 24px; }
-  .note-index { font-size: 32px; }
-  .note-tag { max-width: 62%; overflow-wrap: anywhere; text-align: right; }
-  .note-title { font-size: 21px; }
-  .note-summary { font-size: 13px; }
+  .note-card-top { gap: 9px; margin-bottom: 18px; }
+  .note-index { font-size: 28px; }
+  .note-tag { max-width: 64%; padding: 6px 9px; font-size: 10px; overflow-wrap: anywhere; text-align: right; }
+  .note-title { font-size: 19px; }
+  .note-summary { font-size: 12px; line-height: 1.6; margin-bottom: 16px; }
   .note-contributor { align-items: flex-start; flex-direction: column; }
   .note-action-row { flex-direction: column; }
-  .note-link { width: 100%; min-height: 40px; height: auto; padding: 10px 12px; }
-  .note-topic-list span { max-width: 100%; overflow-wrap: anywhere; }
+  .note-link { width: 100%; min-height: 38px; height: auto; padding: 9px 10px; font-size: 11px; }
+  .note-topic-list { gap: 6px; margin-bottom: 18px; }
+  .note-topic-list span { max-width: 100%; padding: 5px 8px; font-size: 10px; overflow-wrap: anywhere; }
   .unlock-socials { grid-template-columns: 1fr; }
   .guide-scene {
     min-height: 134px;

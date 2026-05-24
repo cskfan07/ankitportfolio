@@ -1022,7 +1022,7 @@ function Notes({resources=defaultResources,userNotes=[],noteMetrics=[]}) {
   const [localMetrics,setLocalMetrics]=useState({});
   const [noteForm,setNoteForm]=useState({name:"",email:"",title:"",subject:"",description:"",topics:"",fileUrl:"",linkedin:"",github:"",instagram:"",accent:"#4a9aa5",consent:false});
   const trackRef=useRef(null);
-  const dragRef=useRef({down:false,startX:0,scrollLeft:0});
+  const dragRef=useRef({down:false,startX:0,startY:0,scrollLeft:0,axis:""});
   const unlockTimerRef=useRef(null);
   const unlockAwayStartRef=useRef(null);
   const approvedUserNotes=userNotes.filter(note=>note.status==="approved").map(note=>({
@@ -1092,6 +1092,25 @@ function Notes({resources=defaultResources,userNotes=[],noteMetrics=[]}) {
     if(!filteredResources.length) return;
     scrollToNote((active+step+filteredResources.length)%filteredResources.length);
   };
+  useEffect(()=>{
+    if(typeof window==="undefined" || filteredResources.length<=1) return undefined;
+    const media=window.matchMedia("(max-width: 600px)");
+    if(!media.matches) return undefined;
+    const timer=window.setInterval(()=>{
+      if(dragRef.current.down) return;
+      setActive(current=>{
+        const next=(current+1)%filteredResources.length;
+        const track=trackRef.current;
+        const card=track?.children?.[next];
+        if(card&&track) {
+          const left=card.offsetLeft-track.offsetLeft;
+          track.scrollTo({left:Math.max(0,left),behavior:"smooth"});
+        }
+        return next;
+      });
+    },4200);
+    return ()=>window.clearInterval(timer);
+  },[filteredResources.length]);
   const updateActive=()=>{
     const track=trackRef.current;
     if(!track) return;
@@ -1105,16 +1124,22 @@ function Notes({resources=defaultResources,userNotes=[],noteMetrics=[]}) {
     });
     setActive(closest);
   };
-  const startDrag=(clientX)=>{
+  const startDrag=(clientX,clientY=0)=>{
     const track=trackRef.current;
     if(!track) return;
-    dragRef.current={down:true,startX:clientX,scrollLeft:track.scrollLeft};
+    dragRef.current={down:true,startX:clientX,startY:clientY,scrollLeft:track.scrollLeft,axis:""};
     track.classList.add("is-dragging");
   };
-  const dragMove=(clientX)=>{
+  const dragMove=(clientX,clientY=0)=>{
     const track=trackRef.current;
     if(!track||!dragRef.current.down) return;
-    track.scrollLeft=dragRef.current.scrollLeft-(clientX-dragRef.current.startX);
+    const dx=clientX-dragRef.current.startX;
+    const dy=clientY-dragRef.current.startY;
+    if(!dragRef.current.axis && (Math.abs(dx)>8||Math.abs(dy)>8)) {
+      dragRef.current.axis=Math.abs(dx)>Math.abs(dy) ? "x" : "y";
+    }
+    if(dragRef.current.axis==="y") return;
+    track.scrollLeft=dragRef.current.scrollLeft-dx;
   };
   const endDrag=()=>{
     const track=trackRef.current;
@@ -1352,12 +1377,12 @@ function Notes({resources=defaultResources,userNotes=[],noteMetrics=[]}) {
               ref={trackRef}
               className="notes-track reveal-target"
               onScroll={updateActive}
-              onMouseDown={e=>startDrag(e.clientX)}
-              onMouseMove={e=>dragMove(e.clientX)}
+              onMouseDown={e=>startDrag(e.clientX,e.clientY)}
+              onMouseMove={e=>dragMove(e.clientX,e.clientY)}
               onMouseUp={endDrag}
               onMouseLeave={endDrag}
-              onTouchStart={e=>startDrag(e.touches[0].clientX)}
-              onTouchMove={e=>dragMove(e.touches[0].clientX)}
+              onTouchStart={e=>startDrag(e.touches[0].clientX,e.touches[0].clientY)}
+              onTouchMove={e=>dragMove(e.touches[0].clientX,e.touches[0].clientY)}
               onTouchEnd={endDrag}
             >
               {filteredResources.length===0 ? (
