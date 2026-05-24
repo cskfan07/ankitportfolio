@@ -2,6 +2,12 @@
 
 A React and Firebase portfolio website with an admin dashboard, project showcase, certificates, skills, contact messages, feedback, and community notes approval flow.
 
+## Author and Usage
+
+Created and maintained by Ankit.
+
+If you copy, fork, modify, or share this project, please keep proper credit to Ankit and include the original license notice. Do not present this work as your own without attribution.
+
 ## Features
 
 - Responsive personal portfolio built with React and Vite
@@ -164,4 +170,3 @@ npm run build    # Build production files
 npm run preview  # Preview production build locally
 npm run lint     # Run ESLint
 ```
-
