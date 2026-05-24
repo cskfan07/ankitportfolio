@@ -160,6 +160,7 @@ async function sendUserNoteStatusEmail(note,status,customReply="") {
   if(!note?.email || !hasEmailJsConfig()) return {sent:false,reason:"missing-config"};
   const email=getNoteEmailMessage(note,status,customReply);
   const portfolioLink=getPortfolioNotesLink();
+  const messageWithLink=`${email.message}\n\nView portfolio: ${portfolioLink}`;
   const response=await fetch("https://api.emailjs.com/api/v1.0/email/send",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -177,7 +178,7 @@ async function sendUserNoteStatusEmail(note,status,customReply="") {
         custom_reply:customReply?.trim()||"",
         portfolio_link:portfolioLink,
         subject:email.subject,
-        message:email.message,
+        message:messageWithLink,
       },
     }),
   });
