@@ -6,7 +6,9 @@ A React and Firebase portfolio website with an admin dashboard, project showcase
 
 Created and maintained by Ankit.
 
-If you copy, fork, modify, or share this project, please keep proper credit to Ankit and include the original license notice. Do not present this work as your own without attribution.
+Copyright (c) 2026 Ankit. All rights reserved.
+
+This code may not be copied, modified, distributed, published, or used in another project without prior written permission from Ankit.
 
 ## Features
 
