@@ -23,6 +23,7 @@ import {
   query,
   orderBy,
   increment,
+  onSnapshot,
 } from "firebase/firestore";
 
 /* eslint-disable no-unused-vars */
@@ -70,6 +71,7 @@ function getGoogleDriveFileId(url) {
   return "";
 }
 const DEFAULT_PROJECT_IMAGE = "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop";
+const NOTE_METRICS_STORAGE_KEY = "portfolioNoteMetrics";
 
 function formatImageUrl(url) {
   const id = getGoogleDriveFileId(url);
@@ -135,6 +137,23 @@ function getPortfolioBaseUrl() {
 }
 function getPortfolioNotesLink() {
   return `${getPortfolioBaseUrl()}#notes`;
+}
+function readStoredNoteMetrics() {
+  if(typeof window==="undefined") return {};
+  try {
+    const value=window.localStorage.getItem(NOTE_METRICS_STORAGE_KEY);
+    return value ? JSON.parse(value) : {};
+  } catch {
+    return {};
+  }
+}
+function saveStoredNoteMetrics(metrics) {
+  if(typeof window==="undefined") return;
+  try {
+    window.localStorage.setItem(NOTE_METRICS_STORAGE_KEY,JSON.stringify(metrics));
+  } catch {
+    // Metrics are a nice-to-have; Firestore remains the source for global counts.
+  }
 }
 function getNoteEmailMessage(note,status,customReply="") {
   const title=note?.title||"your submitted note";
@@ -426,6 +445,23 @@ function useCollection(col,defaults) {
   useEffect(()=>{fetch();},[]);
   return {items,loading,fetch};
 }
+function useNoteMetrics() {
+  const [items,setItems]=useState([]);
+  const [loading,setLoading]=useState(true);
+  useEffect(()=>{
+    const unsubscribe=onSnapshot(collection(db,"noteMetrics"),(snap)=>{
+      const docs=snap.docs.map(d=>({id:d.id,...d.data()}));
+      setItems(docs);
+      setLoading(false);
+    },(error)=>{
+      console.warn("Failed to listen for note metrics", error);
+      setItems([]);
+      setLoading(false);
+    });
+    return unsubscribe;
+  },[]);
+  return {items,loading};
+}
 
 /* ─── App ─── */
 function useInspectGuard() {
@@ -484,7 +520,7 @@ function PortfolioPage() {
   const {items:certs,loading:cl}=useCollection("certificates",defaultCertificates);
   const {items:resources,loading:rl}=useCollection("resources",defaultResources);
   const {items:userNotes,loading:unl}=useCollection("userNotes",[]);
-  const {items:noteMetrics,loading:nml}=useCollection("noteMetrics",[]);
+  const {items:noteMetrics,loading:nml}=useNoteMetrics();
   const filtered=useMemo(()=>{
     const v=search.toLowerCase();
     return projects.filter(p=>p.title?.toLowerCase().includes(v)||p.tech?.toLowerCase().includes(v)||p.description?.toLowerCase().includes(v)||p.experience?.toLowerCase().includes(v));
@@ -1020,7 +1056,7 @@ function Notes({resources=defaultResources,userNotes=[],noteMetrics=[]}) {
   const [shareStatus,setShareStatus]=useState("");
   const [shareLoading,setShareLoading]=useState(false);
   const [copyStatus,setCopyStatus]=useState("");
-  const [localMetrics,setLocalMetrics]=useState({});
+  const [localMetrics,setLocalMetrics]=useState(()=>readStoredNoteMetrics());
   const [noteForm,setNoteForm]=useState({name:"",email:"",title:"",subject:"",description:"",topics:"",fileUrl:"",linkedin:"",github:"",instagram:"",accent:"#4a9aa5",consent:false});
   const trackRef=useRef(null);
   const dragRef=useRef({down:false,startX:0,startY:0,scrollLeft:0,axis:""});
@@ -1076,6 +1112,13 @@ function Notes({resources=defaultResources,userNotes=[],noteMetrics=[]}) {
     if(item?.id) acc[item.id]={downloads:Number(item.downloads||0),shares:Number(item.shares||0)};
     return acc;
   },{}),[noteMetrics]);
+  useEffect(()=>{
+    const syncStoredMetrics=(event)=>{
+      if(event.key===NOTE_METRICS_STORAGE_KEY) setLocalMetrics(readStoredNoteMetrics());
+    };
+    window.addEventListener("storage",syncStoredMetrics);
+    return ()=>window.removeEventListener("storage",syncStoredMetrics);
+  },[]);
 
   const scrollToNote=(index)=>{
     if(!filteredResources.length) return;
@@ -1156,19 +1199,23 @@ function Notes({resources=defaultResources,userNotes=[],noteMetrics=[]}) {
     const saved=savedMetrics[id]||{};
     const local=localMetrics[id]||{};
     return {
-      downloads:Number(saved.downloads||0)+Number(local.downloads||0),
-      shares:Number(saved.shares||0)+Number(local.shares||0),
+      downloads:Math.max(Number(saved.downloads||0),Number(local.downloads||0)),
+      shares:Math.max(Number(saved.shares||0),Number(local.shares||0)),
     };
   };
   const bumpNoteMetric=async(kind,note,field)=>{
     const id=getMetricId(kind,note);
-    setLocalMetrics(metrics=>({
-      ...metrics,
-      [id]:{
-        downloads:Number(metrics[id]?.downloads||0)+(field==="downloads"?1:0),
-        shares:Number(metrics[id]?.shares||0)+(field==="shares"?1:0),
-      },
-    }));
+    setLocalMetrics(metrics=>{
+      const next={
+        ...metrics,
+        [id]:{
+          downloads:Number(metrics[id]?.downloads||0)+(field==="downloads"?1:0),
+          shares:Number(metrics[id]?.shares||0)+(field==="shares"?1:0),
+        },
+      };
+      saveStoredNoteMetrics(next);
+      return next;
+    });
     try {
       await setDoc(doc(db,"noteMetrics",id),{
         noteId:String(note.id||note.title),
