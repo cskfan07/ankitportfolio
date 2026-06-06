@@ -59,8 +59,22 @@ function formatUrl(url) {
   const c = url.trim();
   return /^https?:\/\//i.test(c) ? c : `https://${c}`;
 }
-function getGoogleDriveFileId(url) {
+function unwrapRedirectUrl(url) {
   const c = (url || "").trim();
+  if (!/^https?:\/\//i.test(c)) return c;
+  try {
+    const parsed = new URL(c);
+    const host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
+    if (host === "google.com" && parsed.searchParams.has("url")) {
+      return parsed.searchParams.get("url") || c;
+    }
+  } catch {
+    return c;
+  }
+  return c;
+}
+function getGoogleDriveFileId(url) {
+  const c = unwrapRedirectUrl(url);
   const pats = [
     /drive\.google\.com\/file\/d\/([^/]+)/i,
     /drive\.google\.com\/open\?id=([^&]+)/i,
@@ -74,8 +88,10 @@ const DEFAULT_PROJECT_IMAGE = "https://images.unsplash.com/photo-1498050108023-c
 const NOTE_METRICS_STORAGE_KEY = "portfolioNoteMetrics";
 
 function formatImageUrl(url) {
+  const c = unwrapRedirectUrl(url);
+  if (/^(\/|data:|blob:)/i.test(c)) return c;
   const id = getGoogleDriveFileId(url);
-  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1200` : formatUrl(url);
+  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1200` : formatUrl(c);
 }
 const formatCertificateImageUrl = formatImageUrl;
 function formatDownloadUrl(url) {
@@ -337,6 +353,7 @@ const defaultProfile = {
   email:"ga8774040@gmail.com", github:"https://github.com/cskfan07",
   linkedin:"https://www.linkedin.com/in/ankit-gupta2201?utm_source=share_via&utm_content=profile&utm_medium=member_android",
   instagram:"mky_2201", resumeUrl:"#",
+  profileImages:["/images/ankit-p.png"],
   maintenanceMode:false,
 };
 const defaultSkills = [
@@ -611,8 +628,11 @@ function AdminPage() {
 function Loader() {
   return (
     <div className="loader-screen">
-      <div className="loader-cube" />
-      <p className="loader-text">Loading portfolio…</p>
+      <div className="loader-brand" aria-label="Loading mky_2201 portfolio">
+        <span className="loader-tag">&lt;/&gt;</span>
+        <span className="loader-name">mky_2201</span>
+      </div>
+      <p className="loader-text">Loading portfolio...</p>
     </div>
   );
 }
@@ -662,9 +682,15 @@ function AdminBtn({onAdmin}) {
 function Hero({profile}) {
   const [showResume,setShowResume]=useState(false);
   const [resumeLoading,setResumeLoading]=useState(false);
+  const [activeProfileImage,setActiveProfileImage]=useState(0);
   const roles = ["Java Developer","React Builder","Web Developer","MCA Student","Full-Stack Dev","Aspiring Data Analyst","Power BI & SQL Learner"];
   const typed = useTypewriter(roles);
   const showFeedbackModal = false;
+  const profileImages=(Array.isArray(profile.profileImages) ? profile.profileImages : [])
+    .map(formatImageUrl)
+    .filter(src=>src&&src!=="#");
+  const heroImages=profileImages.length ? profileImages : defaultProfile.profileImages;
+  const heroImage=heroImages[activeProfileImage%heroImages.length];
   const resumeHref=formatResumeViewUrl(profile.resumeUrl);
   const resumeDownloadHref=formatDownloadUrl(profile.resumeUrl);
   const hasResume=resumeHref!=="#";
@@ -673,6 +699,14 @@ function Hero({profile}) {
     {num:"12+",label:"Skills Mastered"},
     {num:"4+",label:"Certificates"},
   ];
+  useEffect(()=>{
+    setActiveProfileImage(0);
+    if(heroImages.length<=1) return undefined;
+    const timer=setInterval(()=>{
+      setActiveProfileImage(prev=>(prev+1)%heroImages.length);
+    },3600);
+    return ()=>clearInterval(timer);
+  },[heroImages.length]);
   return (
     <>
     <section id="home" className="hero-section">
@@ -730,7 +764,7 @@ function Hero({profile}) {
           <div className="hero-card-frame">
             <div className="frame-grid-bg" />
             <div className="profile-circle">
-              <img src="/images/ankit-p.png" alt="Ankit Kumar Gupta" className="profile-photo" onError={e=>e.target.style.display='none'} />
+              <img key={heroImage} src={heroImage} alt="Ankit Kumar Gupta" className="profile-photo" onError={e=>e.target.style.display='none'} />
               <div className="profile-fallback">AK</div>
             </div>
             <div className="stamp-badge">MKY_2201</div>
@@ -1658,21 +1692,35 @@ function Contact({profile}) {
       if(timer) return;
       timer=setTimeout(()=>setShowFeedbackModal(true),1200);
     };
+    const scrollContainer=document.querySelector(".portfolio-slide-main");
+    const getScrollMetric=()=>{
+      if(scrollContainer) {
+        return {
+          scrollTop:scrollContainer.scrollTop,
+          maxScroll:scrollContainer.scrollHeight-scrollContainer.clientHeight,
+          viewportHeight:scrollContainer.clientHeight,
+        };
+      }
+      return {
+        scrollTop:window.scrollY||document.documentElement.scrollTop,
+        maxScroll:document.documentElement.scrollHeight-window.innerHeight,
+        viewportHeight:window.innerHeight,
+      };
+    };
     const handleScroll=()=>{
-      const scrollTop=window.scrollY||document.documentElement.scrollTop;
-      const maxScroll=document.documentElement.scrollHeight-window.innerHeight;
+      const {scrollTop,maxScroll,viewportHeight}=getScrollMetric();
       const progress=maxScroll>0 ? scrollTop/maxScroll : 0;
       const contact=document.getElementById("contact");
       const contactTop=contact?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
-      if(progress>=0.7 || contactTop<window.innerHeight*0.75) {
+      if(progress>=0.7 || contactTop<viewportHeight*0.75) {
         showWhenReady();
-        window.removeEventListener("scroll",handleScroll);
+        (scrollContainer||window).removeEventListener("scroll",handleScroll);
       }
     };
-    window.addEventListener("scroll",handleScroll,{passive:true});
+    (scrollContainer||window).addEventListener("scroll",handleScroll,{passive:true});
     handleScroll();
     return ()=>{
-      window.removeEventListener("scroll",handleScroll);
+      (scrollContainer||window).removeEventListener("scroll",handleScroll);
       if(timer) clearTimeout(timer);
     };
   },[]);
@@ -1897,8 +1945,31 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resou
   };
 
   const saveProfile=async()=>{
-    try{await setDoc(doc(db,"profile","main"),{...profileForm,updatedAt:serverTimestamp()},{merge:true});setProfile(profileForm);flash(setProfileMsg,"✓ Profile saved.");}
+    const nextProfile={
+      ...profileForm,
+      profileImages:(Array.isArray(profileForm.profileImages) ? profileForm.profileImages : [])
+        .map(url=>url.trim())
+        .filter(Boolean),
+    };
+    if(!nextProfile.profileImages.length) nextProfile.profileImages=defaultProfile.profileImages;
+    try{await setDoc(doc(db,"profile","main"),{...nextProfile,updatedAt:serverTimestamp()},{merge:true});setProfile(nextProfile);setProfileForm(nextProfile);flash(setProfileMsg,"✓ Profile saved.");}
     catch{flash(setProfileMsg,"✗ Failed to save.");}
+  };
+  const updateProfileImage=(index,value)=>{
+    setProfileForm(p=>{
+      const images=Array.isArray(p.profileImages) ? [...p.profileImages] : [...defaultProfile.profileImages];
+      images[index]=value;
+      return {...p,profileImages:images};
+    });
+  };
+  const addProfileImage=()=>{
+    setProfileForm(p=>({...p,profileImages:[...(Array.isArray(p.profileImages) ? p.profileImages : defaultProfile.profileImages),""]}));
+  };
+  const removeProfileImage=(index)=>{
+    setProfileForm(p=>{
+      const images=(Array.isArray(p.profileImages) ? p.profileImages : defaultProfile.profileImages).filter((_,i)=>i!==index);
+      return {...p,profileImages:images.length ? images : [""]};
+    });
   };
 
   const toggleMaintenance=async()=>{
@@ -2109,6 +2180,21 @@ function AdminPanel({projects,fetchProjects,certificates,fetchCertificates,resou
             <div className="admin-grid-2">
               {[["name","Name"],["title","Title"],["headline","Headline"],["email","Email"],["github","GitHub URL"],["linkedin","LinkedIn URL"],["instagram","Instagram"],["resumeUrl","Resume URL"]].map(([k,ph])=>(
                 <input key={k} value={profileForm[k]||""} onChange={e=>setProfileForm(p=>({...p,[k]:e.target.value}))} placeholder={ph} className="admin-input" />
+              ))}
+            </div>
+            <div className="profile-images-admin">
+              <div className="profile-images-admin-head">
+                <div>
+                  <h4>Profile Images</h4>
+                  <p>Add direct image links to auto-switch the hero photo. Page links like Pinterest posts will not render.</p>
+                </div>
+                <button type="button" className="panel-save-btn profile-image-add" onClick={addProfileImage}><Plus /> Add More</button>
+              </div>
+              {(Array.isArray(profileForm.profileImages) ? profileForm.profileImages : defaultProfile.profileImages).map((url,index)=>(
+                <div key={index} className="profile-image-row">
+                  <input value={url||""} onChange={e=>updateProfileImage(index,e.target.value)} placeholder="Image URL or /images/photo.png" className="admin-input" />
+                  <button type="button" className="item-delete" onClick={()=>removeProfileImage(index)} disabled={(profileForm.profileImages||[]).length<=1}><Trash2 /> Remove</button>
+                </div>
               ))}
             </div>
             <textarea value={profileForm.about||""} onChange={e=>setProfileForm(p=>({...p,about:e.target.value}))} placeholder="About" className="admin-input admin-textarea" />
